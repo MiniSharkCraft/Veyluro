@@ -1,0 +1,15 @@
+{
+  "ignore_dirs": [
+    ".git",
+    "node_modules",
+    "apps/mobile/node_modules",
+    "apps/mobile/android",
+    "apps/mobile/.expo",
+    "apps/mobile/dist",
+    "apps/web/node_modules",
+    "apps/web/dist",
+    "apps/desktop/node_modules",
+    "apps/desktop/wails-app",
+    "apps/desktop/dist-electron"
+  ]
+}

@@ -1,0 +1,14 @@
+# Exclude non-mobile apps/packages — reduces archive size + Metro crawl time
+apps/desktop/
+apps/web/
+packages/server/
+
+# Build artifacts
+apps/*/dist/
+apps/desktop/wails-app/frontend/dist/
+**/build/
+
+# Dev artifacts
+**/.turbo/
+**/.next/
+**/coverage/

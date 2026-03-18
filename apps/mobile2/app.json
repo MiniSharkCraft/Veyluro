@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "AMoon Eclipse",
+    "slug": "amoon-eclipse",
+    "scheme": "amoon-eclipse",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#08080F"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#08080F"
+      },
+      "package": "com.amoon.eclipse"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "3f9599e5-2923-4d3e-85cc-7c27f102da44"
+      }
+    }
+  }
+}

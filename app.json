@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "9e0809f4-9c41-4e63-bee3-b391a0912b31"
+      }
+    },
+    "android": {
+      "package": "com.congmc.amoon"
+    }
+  }
+}

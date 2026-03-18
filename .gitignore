@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+dist-electron/
+build/
+.expo/
+.next/
+
+# Env files (never commit secrets)
+.env
+.env.local
+.env.*.local
+.dev.vars
+
+# Wrangler
+.wrangler/
+wrangler.toml.bak
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+
+# Editor
+.vscode/settings.json
+.idea/
+*.iml
+
+# TypeScript
+*.tsbuildinfo
+
+# Turbo
+.turbo/
+
+# Expo
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+package-lock.json
+!apps/mobile/package-lock.json
