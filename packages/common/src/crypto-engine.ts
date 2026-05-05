@@ -55,8 +55,10 @@ export interface KeyPairExport {
 
 export interface MessageBundle {
   /** For each recipient: their publicKeyId → their encrypted session key */
-  sessionKeys: Record<string, EncryptedSessionKey>
-  payload: EncryptedPayload
+  sessionKeys: Record<string, EncryptedSessionKey | string>
+  payload?: EncryptedPayload
+  /** Legacy support: older clients stored ciphertext at root level */
+  ciphertext?: string
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -237,8 +239,18 @@ export const decryptMessage = async (
   const myEncryptedKey = bundle.sessionKeys[myId]
   if (!myEncryptedKey) throw new Error('[crypto-engine] No session key found for this recipient.')
 
-  const sessionKey = await unwrapSessionKey(myEncryptedKey, privateKey)
-  return aesDecrypt(sessionKey, bundle.payload)
+  const normalizedKey: EncryptedSessionKey =
+    typeof myEncryptedKey === 'string'
+      ? { encryptedKey: myEncryptedKey, alg: 'RSA-OAEP-2048' }
+      : myEncryptedKey
+
+  const ciphertext = bundle.payload?.ciphertext ?? bundle.ciphertext
+  if (!ciphertext) {
+    throw new Error('[crypto-engine] Missing ciphertext payload.')
+  }
+
+  const sessionKey = await unwrapSessionKey(normalizedKey, privateKey)
+  return aesDecrypt(sessionKey, { ciphertext, alg: 'AES-GCM-256' })
 }
 
 // ─── Key Fingerprint ─────────────────────────────────────────────────────────

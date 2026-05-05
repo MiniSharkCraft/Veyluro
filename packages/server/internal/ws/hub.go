@@ -1,6 +1,8 @@
 package ws
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -36,9 +38,10 @@ type Client struct {
 
 // Hub quản lý tất cả rooms và clients
 type Hub struct {
+	db         *sql.DB
 	mu         sync.RWMutex
 	rooms      map[string]map[*Client]struct{} // roomID → set of clients
-	users      map[string]*Client              // userID → client (cho signaling)
+	users      map[string]map[*Client]struct{} // userID → set of clients
 	register   chan *Client
 	unregister chan *Client
 	broadcast  chan *roomMsg
@@ -56,10 +59,11 @@ type signalMsg struct {
 	data     []byte
 }
 
-func NewHub() *Hub {
+func NewHub(db *sql.DB) *Hub {
 	return &Hub{
+		db:         db,
 		rooms:      make(map[string]map[*Client]struct{}),
-		users:      make(map[string]*Client),
+		users:      make(map[string]map[*Client]struct{}),
 		register:   make(chan *Client, 64),
 		unregister: make(chan *Client, 64),
 		broadcast:  make(chan *roomMsg, 256),
@@ -67,20 +71,28 @@ func NewHub() *Hub {
 	}
 }
 
-// SendToUser gửi signal trực tiếp tới một user (dùng cho WebRTC signaling)
-func (h *Hub) SendToUser(toUserID string, data []byte) bool {
+// SendToUserInRoom gửi signal tới user trong đúng room (tránh cross-room spoofing).
+func (h *Hub) SendToUserInRoom(toUserID, roomID string, data []byte) bool {
 	h.mu.RLock()
-	c, ok := h.users[toUserID]
+	set, ok := h.users[toUserID]
 	h.mu.RUnlock()
 	if !ok {
 		return false
 	}
-	select {
-	case c.send <- data:
-		return true
-	default:
-		return false
+
+	delivered := false
+	for c := range set {
+		if c.roomID != roomID {
+			continue
+		}
+		select {
+		case c.send <- data:
+			delivered = true
+		default:
+			go func(client *Client) { h.unregister <- client }(c)
+		}
 	}
+	return delivered
 }
 
 // BroadcastToRoom gửi data tới tất cả clients trong room (kể cả sender — dùng cho HTTP-triggered push).
@@ -106,7 +118,10 @@ func (h *Hub) Run() {
 				h.rooms[c.roomID] = make(map[*Client]struct{})
 			}
 			h.rooms[c.roomID][c] = struct{}{}
-			h.users[c.userID] = c
+			if h.users[c.userID] == nil {
+				h.users[c.userID] = make(map[*Client]struct{})
+			}
+			h.users[c.userID][c] = struct{}{}
 			h.mu.Unlock()
 
 		case c := <-h.unregister:
@@ -117,8 +132,11 @@ func (h *Hub) Run() {
 					delete(h.rooms, c.roomID)
 				}
 			}
-			if h.users[c.userID] == c {
-				delete(h.users, c.userID)
+			if userSet, ok := h.users[c.userID]; ok {
+				delete(userSet, c)
+				if len(userSet) == 0 {
+					delete(h.users, c.userID)
+				}
 			}
 			h.mu.Unlock()
 			close(c.send)
@@ -148,6 +166,10 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 	roomID := r.URL.Query().Get("room")
 	if roomID == "" {
 		http.Error(w, "missing room", http.StatusBadRequest)
+		return
+	}
+	if !h.isRoomMember(r, roomID, userID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 
@@ -227,11 +249,15 @@ func (c *Client) readPump() {
 			if err := json.Unmarshal(toUserIDRaw, &toUserID); err != nil || toUserID == "" {
 				continue
 			}
+			// Pairwise signals chỉ được gửi cho thành viên cùng room.
+			if !c.hub.isUserInRoom(c.roomID, toUserID) {
+				continue
+			}
 			// Override fromUserId với server-verified user ID
 			fromJSON, _ := json.Marshal(c.userID)
 			raw["fromUserId"] = fromJSON
 			out, _ := json.Marshal(raw)
-			c.hub.SendToUser(toUserID, out)
+			c.hub.SendToUserInRoom(toUserID, c.roomID, out)
 			continue
 		}
 
@@ -256,13 +282,8 @@ func (c *Client) readPump() {
 		if frame.Type != "message" {
 			continue
 		}
-
-		// Broadcast E2EE bundle tới các client khác trong cùng room
-		c.hub.broadcast <- &roomMsg{
-			roomID: c.roomID,
-			data:   msg,
-			from:   c,
-		}
+		// Message realtime được push từ HTTP /api/messages để tránh duplicate frame.
+		continue
 	}
 }
 
@@ -292,4 +313,32 @@ func (c *Client) writePump() {
 			}
 		}
 	}
+}
+
+func (h *Hub) isRoomMember(r *http.Request, roomID, userID string) bool {
+	if h.db == nil {
+		return false
+	}
+	var cnt int
+	err := h.db.QueryRowContext(
+		r.Context(),
+		`SELECT COUNT(*) FROM room_members WHERE room_id=? AND user_id=?`,
+		roomID,
+		userID,
+	).Scan(&cnt)
+	return err == nil && cnt > 0
+}
+
+func (h *Hub) isUserInRoom(roomID, userID string) bool {
+	if h.db == nil {
+		return false
+	}
+	var cnt int
+	err := h.db.QueryRowContext(
+		context.Background(),
+		`SELECT COUNT(*) FROM room_members WHERE room_id=? AND user_id=?`,
+		roomID,
+		userID,
+	).Scan(&cnt)
+	return err == nil && cnt > 0
 }

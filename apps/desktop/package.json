@@ -9,7 +9,7 @@
     "build": "pnpm --filter @messmini/web build && electron-builder",
     "build:win": "electron-builder --win",
     "build:linux": "electron-builder --linux",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit -p ./wails-app/frontend/tsconfig.json"
   },
   "dependencies": {
     "electron-updater": "^6.3.0"

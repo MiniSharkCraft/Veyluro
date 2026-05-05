@@ -1,15 +1,13 @@
 import { create } from 'zustand'
 import { openDB, type IDBPDatabase } from 'idb'
+import { API_BASE_URL, WS_BASE_URL } from '../lib/runtimeConfig'
 import {
   generateRsaKeyPair, exportRsaKeyPair, importRsaPrivateKey,
   publicKeyFingerprint, encryptPrivateKeyWithPassphrase,
 } from '../lib/crypto'
 
-// Configure via frontend/.env — see frontend/.env.example
-export const API = import.meta.env.VITE_API_URL ?? 'http://localhost:8080'
-export const WS_BASE = (import.meta.env.VITE_API_URL ?? 'http://localhost:8080')
-  .replace(/^https/, 'wss')
-  .replace(/^http/, 'ws')
+export const API = API_BASE_URL
+export const WS_BASE = WS_BASE_URL
 
 interface AuthState {
   isAuthenticated: boolean
@@ -23,6 +21,7 @@ interface AuthState {
   login:           (username: string, password: string) => Promise<void>
   register:        (username: string, email: string, password: string, passphrase: string) => Promise<void>
   loginWithOAuth:  (accessToken: string, passphrase?: string) => Promise<void>
+  completeOAuthLogin: (payload: { userId: string; username: string; token: string }, passphrase?: string) => Promise<void>
   logout:          () => void
   setSession:      (userId: string, username: string, token: string, privKey: CryptoKey, pubKey: string) => void
 }
@@ -83,36 +82,23 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   register: async (username, email, password, passphrase) => {
     const passwordHash = password
-    const kp = await generateRsaKeyPair()
-    const { publicKey, privateKey } = await exportRsaKeyPair(kp)
-    const fingerprint = await publicKeyFingerprint(publicKey)
 
     const res = await fetch(`${API}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, email, password: passwordHash, publicKey, fingerprint }),
+      body: JSON.stringify({ username, email, password: passwordHash }),
     })
     if (!res.ok) throw new Error((await res.json()).error ?? 'Registration failed')
     const data = await res.json()
     const userId = data.userId ?? data.id
 
-    await savePrivateKey(userId, privateKey)
-
-    if (passphrase) {
-      const { bundle, saltHex } = await encryptPrivateKeyWithPassphrase(privateKey, passphrase)
-      await fetch(`${API}/api/auth/store-encrypted-key`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.token}` },
-        body: JSON.stringify({ encryptedKey: bundle, keySalt: saltHex }),
-      })
-    }
-
-    const privKey = await importRsaPrivateKey(privateKey)
-    set({ isAuthenticated: true, userId, username, publicKey, privateKey: privKey, token: data.token, needsKeyRecovery: false })
+    const created = await setupE2eeKey(userId, data.token, passphrase)
+    const privKey = await importRsaPrivateKey(created.privateKey)
+    set({ isAuthenticated: true, userId, username, publicKey: created.publicKey, privateKey: privKey, token: data.token, needsKeyRecovery: false })
     sessionStorage.setItem('amoon:userId',   userId)
     sessionStorage.setItem('amoon:token',    data.token ?? '')
     sessionStorage.setItem('amoon:username', username)
-    sessionStorage.setItem('amoon:pubKey',   publicKey)
+    sessionStorage.setItem('amoon:pubKey',   created.publicKey)
   },
 
   login: async (username, password) => {
@@ -170,6 +156,31 @@ export const useAuthStore = create<AuthState>((set) => ({
     sessionStorage.setItem('amoon:token',    data.token)
     sessionStorage.setItem('amoon:username', data.username)
     sessionStorage.setItem('amoon:pubKey',   pubKey ?? '')
+  },
+
+  completeOAuthLogin: async (payload, passphrase) => {
+    let privKey = await loadPrivateKey(payload.userId)
+    let pubKey = sessionStorage.getItem('amoon:pubKey') ?? undefined
+
+    if (!privKey) {
+      const created = await setupE2eeKey(payload.userId, payload.token, passphrase)
+      privKey = await importRsaPrivateKey(created.privateKey)
+      pubKey = created.publicKey
+    }
+
+    set({
+      isAuthenticated: true,
+      userId: payload.userId,
+      username: payload.username,
+      publicKey: pubKey ?? null,
+      privateKey: privKey,
+      token: payload.token,
+      needsKeyRecovery: false,
+    })
+    sessionStorage.setItem('amoon:userId', payload.userId)
+    sessionStorage.setItem('amoon:token', payload.token)
+    sessionStorage.setItem('amoon:username', payload.username)
+    sessionStorage.setItem('amoon:pubKey', pubKey ?? '')
   },
 
   logout: () => {

@@ -37,6 +37,7 @@ func (h *Handler) Routes() chi.Router {
 
 type msgResp struct {
 	ID        string `json:"id"`
+	ClientID  string `json:"clientId,omitempty"`
 	RoomID    string `json:"roomId"`
 	SenderID  string `json:"senderId"`
 	Bundle    string `json:"bundle"` // opaque E2EE JSON
@@ -96,7 +97,8 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 }
 
 type sendReq struct {
-	Bundle string `json:"bundle"` // MessageBundle JSON từ client
+	Bundle   string `json:"bundle"`             // MessageBundle JSON từ client
+	ClientID string `json:"clientId,omitempty"` // client-generated optimistic ID
 }
 
 func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
@@ -141,6 +143,7 @@ func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 		wsMsg, _ := json.Marshal(map[string]any{
 			"type":      "message",
 			"id":        id,
+			"clientId":  req.ClientID,
 			"roomId":    roomID,
 			"senderId":  userID,
 			"bundle":    req.Bundle,
@@ -172,7 +175,7 @@ func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	w.WriteHeader(http.StatusCreated)
-	jsonOK(w, map[string]string{"id": id})
+	jsonOK(w, map[string]string{"id": id, "clientId": req.ClientID})
 }
 
 func isMember(db *sql.DB, r *http.Request, roomID, userID string) bool {

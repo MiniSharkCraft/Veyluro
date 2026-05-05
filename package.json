@@ -2,19 +2,26 @@
   "name": "messmini",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@9.0.0",
   "description": "Mini Messenger - Multi-platform E2EE chat. CongMC Dev Team.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "engines": {
     "node": ">=20.0.0"
   },
   "scripts": {
     "dev:web": "npm run dev --workspace=apps/web",
     "dev:mobile": "cd apps/mobile && node ../../node_modules/.bin/expo start",
-    "build": "turbo build",
+    "setup:server": "./scripts/setup-server.sh",
+    "setup:app": "./scripts/setup-app.sh",
+    "build": "npm run --workspaces --if-present build",
     "build:web": "npm run build --workspace=apps/web",
-    "type-check": "turbo type-check",
-    "lint": "turbo lint",
-    "test": "turbo test",
-    "clean": "turbo clean && rm -rf node_modules"
+    "type-check": "npm run --workspaces --if-present type-check",
+    "lint": "npm run --workspaces --if-present lint",
+    "test": "npm run --workspaces --if-present test",
+    "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {
     "turbo": "^2.3.0",

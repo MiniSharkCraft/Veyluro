@@ -49,11 +49,11 @@ function NotesRow({ notes, loading, timeLeft, onAdd }: {
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={nt.strip}>
         {notes.map(n => (
-          <TouchableOpacity key={n.id} style={[nt.card, { backgroundColor: avatarBg(n.username) }]} activeOpacity={0.8}>
+          <TouchableOpacity key={n.id} style={[nt.card, { backgroundColor: avatarBg(n.username ?? 'note') }]} activeOpacity={0.8}>
             <Text style={nt.noteText} numberOfLines={3}>{n.content}</Text>
             <View style={nt.footer}>
-              <Text style={nt.noteAuthor}>@{n.username}</Text>
-              <Text style={nt.noteTime}>{timeLeft(n.expires_at)}</Text>
+              <Text style={nt.noteAuthor}>@{n.username ?? 'unknown'}</Text>
+              <Text style={nt.noteTime}>{timeLeft(n.expiresAt)}</Text>
             </View>
           </TouchableOpacity>
         ))}
@@ -87,7 +87,7 @@ export default function ChatsScreen() {
       const room = await startDm(dmTarget.trim())
       setNewDmModal(false)
       setDmTarget('')
-      if (room) router.push(`/(app)/room/${room.id}`)
+      if (room) router.push(`/(app)/room/${room}`)
     } catch (e: unknown) {
       Alert.alert('Lỗi', e instanceof Error ? e.message : 'Không tìm thấy user')
     } finally {
@@ -185,7 +185,7 @@ export default function ChatsScreen() {
               <View style={s.rowTop}>
                 <Text style={s.rowName}>{item.name}</Text>
                 <Text style={s.rowTime}>
-                  {new Date(item.created_at * 1000).toLocaleDateString('vi', { day: '2-digit', month: '2-digit' })}
+                  {new Date((item.createdAt ?? item.created_at ?? Math.floor(Date.now() / 1000)) * 1000).toLocaleDateString('vi', { day: '2-digit', month: '2-digit' })}
                 </Text>
               </View>
               <Text style={s.rowLast} numberOfLines={1}>

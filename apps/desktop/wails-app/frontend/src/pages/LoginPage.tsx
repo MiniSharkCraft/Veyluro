@@ -1,19 +1,17 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAuthStore, API } from '../stores/authStore'
 import { hashPassword } from '../lib/crypto'
 
 // Wails runtime types
 declare const window: Window & {
-  go?: { main: { App: { StartGoogleOAuth: () => Promise<void> } } }
+  go?: { main: { App: { StartGoogleOAuth: (apiBase: string) => Promise<void> } } }
   runtime?: { EventsOn: (e: string, cb: (data: unknown) => void) => void }
 }
 
-type Tab    = 'password' | 'google'
 type Mode   = 'login' | 'register'
 type Screen = 'main' | 'forgot' | 'reset'
 
 export function LoginPage() {
-  const [tab,    setTab]    = useState<Tab>('password')
   const [mode,   setMode]   = useState<Mode>('login')
   const [screen, setScreen] = useState<Screen>('main')
 
@@ -33,19 +31,14 @@ export function LoginPage() {
   const [info,    setInfo]    = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const { login, register, loginWithOAuth } = useAuthStore()
-
-  // Listen for Google OAuth token from Go (Wails event)
-  useEffect(() => {
-    window.runtime?.EventsOn('oauth:google', async (token: unknown) => {
-      setLoading(true); setError(null)
-      try {
-        await loginWithOAuth(token as string, passphrase || undefined)
-      } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : 'Google login failed')
-      } finally { setLoading(false) }
-    })
-  }, [passphrase])
+  const { login, register } = useAuthStore()
+  const apiHostLabel = (() => {
+    try {
+      return new URL(API).host
+    } catch {
+      return API
+    }
+  })()
 
   const wrap = async (fn: () => Promise<void>) => {
     setError(null); setInfo(null); setLoading(true)
@@ -64,21 +57,6 @@ export function LoginPage() {
         await register(username, email, password, passphrase)
       } else {
         await login(username, password)
-      }
-    })
-  }
-
-  // ── Google OAuth ──────────────────────────────────────────────────────────
-  const startGoogle = () => {
-    if (mode === 'register' && passphrase !== confirmPassphrase) {
-      setError('Passphrases do not match'); return
-    }
-    wrap(async () => {
-      if (window.go?.main?.App?.StartGoogleOAuth) {
-        await window.go.main.App.StartGoogleOAuth()
-        setInfo('Browser opened — complete sign-in then return here.')
-      } else {
-        throw new Error('Wails runtime not available')
       }
     })
   }
@@ -149,7 +127,6 @@ export function LoginPage() {
           {[
             { icon: '🔐', title: 'Zero-Knowledge E2EE', desc: 'RSA-2048 + AES-256-GCM per message' },
             { icon: '🔑', title: 'Passphrase Recovery', desc: 'Restore keys on new devices securely' },
-            { icon: '🌐', title: 'Google Sign-In', desc: 'OAuth 2.0 via system browser' },
           ].map(f => (
             <div key={f.title} className="flex gap-3">
               <span className="text-lg shrink-0">{f.icon}</span>
@@ -162,7 +139,7 @@ export function LoginPage() {
         </div>
 
         {/* Version */}
-        <p className="text-dark-400/50 text-xs">Beta v1.0</p>
+        <p className="text-dark-400/50 text-xs">v0.1.0 · {apiHostLabel}</p>
       </div>
 
       {/* ── Right: Form panel ─────────────────────────────────────────────── */}
@@ -209,19 +186,6 @@ export function LoginPage() {
                 {mode === 'login' ? 'Sign in to your encrypted workspace.' : 'Set up your zero-knowledge identity.'}
               </p>
 
-              {/* ── Tab: Password / Google ────────────────────────────── */}
-              <div className="flex bg-dark-800 rounded-cyber p-0.5 mb-6 border border-dark-400">
-                {(['password', 'google'] as Tab[]).map(t => (
-                  <button key={t} onClick={() => setTab(t)}
-                    className={`flex-1 py-2 text-xs rounded-cyber transition-all font-semibold uppercase tracking-widest ${
-                      tab === t ? 'bg-dark-600 text-neon-cyan shadow-sm border border-dark-400' : 'text-dark-400 hover:text-neon-cyan'
-                    }`}
-                  >
-                    {t === 'password' ? 'Password' : 'Google'}
-                  </button>
-                ))}
-              </div>
-
               {/* ── Mode: Login / Register ────────────────────────────── */}
               <div className="flex gap-3 mb-6">
                 {(['login', 'register'] as Mode[]).map(m => (
@@ -237,68 +201,40 @@ export function LoginPage() {
 
               <Feedback error={error} info={info} />
 
-              {/* ── Passphrase fields (shared for both tabs when registering) ── */}
-              {tab === 'google' ? (
-                <div className="space-y-4">
-                  {mode === 'register' && (
-                    <div className="space-y-3">
-                      <PassphraseFields
-                        passphrase={passphrase} setPassphrase={setPassphrase}
-                        confirm={confirmPassphrase} setConfirm={setConfirmPassphrase}
-                      />
-                    </div>
-                  )}
+              <form onSubmit={submitPassword} className="space-y-4">
+                <FormField label="Username" value={username} onChange={setUsername} placeholder="your_username" autoComplete="username" />
 
-                  <button
-                    type="button"
-                    onClick={startGoogle}
-                    disabled={loading}
-                    className="w-full flex items-center justify-center gap-3 bg-white/5 border border-dark-400 text-white py-3 rounded-cyber hover:bg-white/10 hover:border-neon-cyan/40 transition-all disabled:opacity-40"
+                {mode === 'register' && (
+                  <FormField label="Email" type="email" value={email} onChange={setEmail} placeholder="you@example.com" autoComplete="email" />
+                )}
+
+                <FormField label="Password" type="password" value={password} onChange={setPassword} placeholder="••••••••"
+                  autoComplete={mode === 'register' ? 'new-password' : 'current-password'} />
+
+                {mode === 'register' && (
+                  <PassphraseFields
+                    passphrase={passphrase} setPassphrase={setPassphrase}
+                    confirm={confirmPassphrase} setConfirm={setConfirmPassphrase}
+                  />
+                )}
+
+                <Btn loading={loading} label={mode === 'login' ? 'Sign In' : 'Create Account'} />
+
+                {mode === 'login' && (
+                  <button type="button" onClick={() => setScreen('forgot')}
+                    className="w-full text-center text-xs text-dark-400 hover:text-neon-cyan transition-colors mt-1"
                   >
-                    <span className="w-5 h-5 rounded-full bg-white flex items-center justify-center text-xs font-black text-gray-800">G</span>
-                    <span className="text-sm font-semibold">{loading ? 'Opening browser...' : 'Continue with Google'}</span>
+                    Forgot password?
                   </button>
+                )}
 
-                  <p className="text-dark-400/60 text-xs text-center">
-                    Opens your system browser to authenticate with Google.
+                {mode === 'register' && (
+                  <p className="text-xs text-dark-400/70 text-center leading-relaxed">
+                    Your private key is generated locally.<br/>
+                    <span className="text-neon-yellow/80">The server never sees it.</span>
                   </p>
-                </div>
-              ) : (
-                <form onSubmit={submitPassword} className="space-y-4">
-                  <FormField label="Username" value={username} onChange={setUsername} placeholder="your_username" autoComplete="username" />
-
-                  {mode === 'register' && (
-                    <FormField label="Email" type="email" value={email} onChange={setEmail} placeholder="you@example.com" autoComplete="email" />
-                  )}
-
-                  <FormField label="Password" type="password" value={password} onChange={setPassword} placeholder="••••••••"
-                    autoComplete={mode === 'register' ? 'new-password' : 'current-password'} />
-
-                  {mode === 'register' && (
-                    <PassphraseFields
-                      passphrase={passphrase} setPassphrase={setPassphrase}
-                      confirm={confirmPassphrase} setConfirm={setConfirmPassphrase}
-                    />
-                  )}
-
-                  <Btn loading={loading} label={mode === 'login' ? 'Sign In' : 'Create Account'} />
-
-                  {mode === 'login' && (
-                    <button type="button" onClick={() => setScreen('forgot')}
-                      className="w-full text-center text-xs text-dark-400 hover:text-neon-cyan transition-colors mt-1"
-                    >
-                      Forgot password?
-                    </button>
-                  )}
-
-                  {mode === 'register' && (
-                    <p className="text-xs text-dark-400/70 text-center leading-relaxed">
-                      Your private key is generated locally.<br/>
-                      <span className="text-neon-yellow/80">The server never sees it.</span>
-                    </p>
-                  )}
-                </form>
-              )}
+                )}
+              </form>
             </>
           )}
         </div>

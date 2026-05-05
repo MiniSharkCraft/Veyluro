@@ -5,6 +5,7 @@ import { encryptMessage, decryptMessage, type MessageBundle } from '../lib/crypt
 
 export type ChatMsg = {
   id: string
+  clientId?: string
   text: string
   senderId: string
   mine: boolean
@@ -85,11 +86,23 @@ export function useChat(roomId: string) {
             .toLocaleTimeString('vi', { hour: '2-digit', minute: '2-digit' })
           const msg: ChatMsg = {
             id: data.id ?? Date.now().toString(),
+            clientId: data.clientId,
             text, senderId: data.senderId,
             mine: data.senderId === session.userId,
             time, status: 'delivered',
           }
-          setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg])
+          setMessages(prev => {
+            if (prev.some(m => m.id === msg.id)) return prev
+            if (msg.mine && msg.clientId) {
+              const optimisticIndex = prev.findIndex(m => m.id === msg.clientId || m.clientId === msg.clientId)
+              if (optimisticIndex >= 0) {
+                const next = [...prev]
+                next[optimisticIndex] = { ...next[optimisticIndex], ...msg, pending: false }
+                return next
+              }
+            }
+            return [...prev, msg]
+          })
         } catch (err) {
           console.warn('[useChat] decrypt:', err)
         }
@@ -108,18 +121,15 @@ export function useChat(roomId: string) {
     if (!session || !text.trim()) return
     const tempId = `temp_${Date.now()}`
     const time = new Date().toLocaleTimeString('vi', { hour: '2-digit', minute: '2-digit' })
-    const optimistic: ChatMsg = { id: tempId, text, senderId: session.userId, mine: true, time, status: 'sent', pending: true }
+    const optimistic: ChatMsg = { id: tempId, clientId: tempId, text, senderId: session.userId, mine: true, time, status: 'sent', pending: true }
     setMessages(prev => [...prev, optimistic])
     try {
       const recipients = members.filter(m => m.publicKey).map(m => ({ id: m.id, publicKey: m.publicKey }))
       if (recipients.length === 0) throw new Error('Không có recipient')
       const bundle = await encryptMessage(text, recipients)
       const bundleStr = JSON.stringify(bundle)
-      const { id } = await messagesApi.send(roomId, bundleStr)
-      if (ws.current?.readyState === WebSocket.OPEN) {
-        ws.current.send(JSON.stringify({ type: 'message', data: { id, senderId: session.userId, bundle: bundleStr } }))
-      }
-      setMessages(prev => prev.map(m => m.id === tempId ? { ...m, id, status: 'delivered', pending: false } : m))
+      const { id } = await messagesApi.send(roomId, bundleStr, tempId)
+      setMessages(prev => prev.map(m => m.id === tempId ? { ...m, id, clientId: tempId, status: 'delivered', pending: false } : m))
     } catch (err) {
       console.error('[useChat] send:', err)
       setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'sent', pending: false } : m))

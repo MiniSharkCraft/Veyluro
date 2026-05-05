@@ -1,11 +1,21 @@
 import { storage } from './storage'
+import { API_BASE_URL, WS_BASE_URL } from './runtimeConfig'
 
-// Configure via .env — see .env.example
-const BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080'
-export const WS_BASE = BASE.replace(/^http/, 'ws')
+const BASE = API_BASE_URL
+export const WS_BASE = WS_BASE_URL
 
 class ApiError extends Error {
   constructor(public status: number, message: string) { super(message) }
+}
+
+async function parseResponseBody(res: Response): Promise<unknown> {
+  const text = await res.text()
+  if (!text) return null
+  try {
+    return JSON.parse(text) as unknown
+  } catch {
+    return text
+  }
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -17,10 +27,20 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (token) headers['Authorization'] = `Bearer ${token}`
   const res = await fetch(`${BASE}${path}`, { ...init, headers })
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: res.statusText }))
-    throw new ApiError(res.status, body.error ?? res.statusText)
+    const body = await parseResponseBody(res)
+    if (body && typeof body === 'object') {
+      const message = (body as { error?: string; message?: string }).error
+        ?? (body as { error?: string; message?: string }).message
+        ?? res.statusText
+      throw new ApiError(res.status, message)
+    }
+    if (typeof body === 'string' && body.trim().startsWith('<')) {
+      throw new ApiError(res.status, `Server trả về HTML thay vì JSON (${res.status}). Kiểm tra lại API URL/reverse proxy.`)
+    }
+    throw new ApiError(res.status, typeof body === 'string' && body.trim() ? body : res.statusText)
   }
-  return res.json()
+  const body = await parseResponseBody(res)
+  return body as T
 }
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -97,6 +117,11 @@ export type ProfileType = {
   totpEnabled: boolean
   isAdmin: boolean
 }
+export type UpdateProfileResponse = {
+  status: string
+  username?: string
+  token?: string
+}
 export type ReportType = {
   id: string
   reason: string
@@ -141,8 +166,8 @@ export const messagesApi = {
     const q = before ? `?before=${before}&limit=50` : '?limit=50'
     return request<MessageType[]>(`/api/messages/${roomId}${q}`)
   },
-  send: (roomId: string, bundle: string) => request<{ id: string }>(`/api/messages/${roomId}`, {
-    method: 'POST', body: JSON.stringify({ bundle }),
+  send: (roomId: string, bundle: string, clientId?: string) => request<{ id: string; clientId?: string }>(`/api/messages/${roomId}`, {
+    method: 'POST', body: JSON.stringify({ bundle, clientId }),
   }),
 }
 
@@ -167,7 +192,7 @@ export const usersApi = {
   search: (q: string) => request<SearchUserType[]>(`/api/users/search?q=${encodeURIComponent(q)}`),
   me: () => request<ProfileType>('/api/users/me'),
   updateProfile: (data: { displayName?: string; bio?: string; username?: string }) =>
-    request<{ status: string }>('/api/users/me', { method: 'PATCH', body: JSON.stringify(data) }),
+    request<UpdateProfileResponse>('/api/users/me', { method: 'PATCH', body: JSON.stringify(data) }),
   inviteLink: () => request<{ token: string; link: string }>('/api/users/invite-link'),
   resolveInvite: (token: string) => request<{ userId: string; username: string }>(`/api/users/invite/${token}`),
   totpSetup: () => request<{ secret: string; url: string }>('/api/users/totp/setup', { method: 'POST' }),

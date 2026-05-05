@@ -10,8 +10,9 @@ import {
   generateRsaKeyPair, exportRsaKeyPair, publicKeyFingerprint,
   encryptPrivateKeyWithPassphrase,
 } from '../src/lib/crypto'
+import { API_BASE_URL } from '../src/lib/runtimeConfig'
 
-const API = process.env.EXPO_PUBLIC_API_URL ?? process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080'
+const API = API_BASE_URL
 
 export default function GoogleCallbackScreen() {
   const params = useLocalSearchParams<{ token?: string; userId?: string; username?: string; error?: string }>()

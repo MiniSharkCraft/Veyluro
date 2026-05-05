@@ -5,11 +5,9 @@
  * Private keys NEVER leave IndexedDB. Zero-Knowledge.
  */
 
-// Configure via .env — see .env.example
-const API = import.meta.env.VITE_API_URL ?? 'http://localhost:8080'
-
 import { create } from 'zustand'
 import { openDB, type IDBPDatabase } from 'idb'
+import { API_BASE_URL } from '../lib/runtimeConfig'
 import {
   generateRsaKeyPair,
   exportRsaKeyPair,
@@ -30,6 +28,13 @@ interface AuthState {
   register: (username: string, password: string) => Promise<void>
   logout: () => void
   loadKeysFromStorage: () => Promise<void>
+}
+
+type AuthPayload = {
+  token: string
+  userId: string
+  username: string
+  publicKey?: string
 }
 
 // ─── IndexedDB (private key storage) ─────────────────────────────────────────
@@ -75,53 +80,62 @@ export const useAuthStore = create<AuthState>((set, _get) => ({
     const kp = await generateRsaKeyPair()
     const { publicKey, privateKey } = await exportRsaKeyPair(kp)
     const fingerprint = await publicKeyFingerprint(publicKey)
-    const passwordHash = await hashPassword(password)
+    const serverPassword = await hashPassword(password)
 
-    const res = await fetch(`${API}/api/auth/register`, {
+    const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, publicKey, fingerprint, passwordHash }),
+      body: JSON.stringify({ username, password: serverPassword }),
     })
     if (!res.ok) throw new Error((await res.json()).error)
-    const data = await res.json()
-    const token: string = data.token ?? ''
+    const data = await res.json() as AuthPayload
 
-    await savePrivateKeyToIDB(data.id, privateKey)
+    const keyRes = await fetch(`${API_BASE_URL}/api/auth/register-key`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${data.token}`,
+      },
+      body: JSON.stringify({ publicKey, fingerprint }),
+    })
+    if (!keyRes.ok) throw new Error((await keyRes.json()).error ?? 'Failed to register public key')
+
+    await savePrivateKeyToIDB(data.userId, privateKey)
     const privKey = await importRsaPrivateKey(privateKey)
 
-    localStorage.setItem('amoon_token', token)
-    localStorage.setItem('amoon_userId', data.id)
+    localStorage.setItem('amoon_token', data.token)
+    localStorage.setItem('amoon_userId', data.userId)
     localStorage.setItem('amoon_username', username)
-    sessionStorage.setItem('messmini:userId', data.id)
+    sessionStorage.setItem('messmini:userId', data.userId)
 
-    set({ isAuthenticated: true, userId: data.id, username, publicKey, privateKey: privKey, token })
+    set({ isAuthenticated: true, userId: data.userId, username, publicKey, privateKey: privKey, token: data.token })
   },
 
   login: async (username, password) => {
-    const passwordHash = await hashPassword(password)
-    const res = await fetch(`${API}/api/auth/login`, {
+    const serverPassword = await hashPassword(password)
+    const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, passwordHash }),
+      body: JSON.stringify({ username, password: serverPassword }),
     })
     if (!res.ok) throw new Error((await res.json()).error)
-    const { token, user } = await res.json()
+    const data = await res.json() as AuthPayload
 
-    const privKey = await loadPrivateKeyFromIDB(user.id)
+    const privKey = await loadPrivateKeyFromIDB(data.userId)
     if (!privKey) throw new Error('Private key not found on this device. Please re-register or restore a backup.')
 
-    localStorage.setItem('amoon_token', token)
-    localStorage.setItem('amoon_userId', user.id)
-    localStorage.setItem('amoon_username', user.username)
-    sessionStorage.setItem('messmini:userId', user.id)
+    localStorage.setItem('amoon_token', data.token)
+    localStorage.setItem('amoon_userId', data.userId)
+    localStorage.setItem('amoon_username', data.username)
+    sessionStorage.setItem('messmini:userId', data.userId)
 
     set({
       isAuthenticated: true,
-      userId: user.id,
-      username: user.username,
-      publicKey: user.publicKey,
+      userId: data.userId,
+      username: data.username,
+      publicKey: data.publicKey ?? null,
       privateKey: privKey,
-      token,
+      token: data.token,
     })
   },
 

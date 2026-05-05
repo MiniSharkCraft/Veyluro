@@ -16,7 +16,7 @@ import {
 
 WebBrowser.maybeCompleteAuthSession()
 
-const API = process.env.EXPO_PUBLIC_API_URL ?? 'https://amoon-eclipse.fly.dev'
+const API = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080'
 
 // Không hash client-side — server tự Argon2id, gửi thẳng qua HTTPS
 const hashPassword = (pw: string) => Promise.resolve(pw)

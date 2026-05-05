@@ -3,6 +3,4 @@
 
 export function AppName():Promise<string>;
 
-export function ExchangeGoogleToken(arg1:string,arg2:string):Promise<string>;
-
-export function StartGoogleOAuth():Promise<void>;
+export function StartGoogleOAuth(arg1:string):Promise<void>;

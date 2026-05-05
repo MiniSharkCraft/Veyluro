@@ -11,8 +11,9 @@ import {
   decryptPrivateKeyWithPassphrase,
   generateRsaKeyPair, exportRsaKeyPair, publicKeyFingerprint,
 } from '../../src/lib/crypto'
+import { API_BASE_URL } from '../../src/lib/runtimeConfig'
 
-const API = process.env.EXPO_PUBLIC_API_URL ?? process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080'
+const API = API_BASE_URL
 
 export default function RecoverKeyScreen() {
   const [passphrase, setPassphrase] = useState('')

@@ -19,9 +19,20 @@
       },
       "package": "com.amoon.eclipse"
     },
+    "ios": {
+      "bundleIdentifier": "com.amoon.eclipse",
+      "buildNumber": "1",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Used to secure your encryption keys",
+        "NSCameraUsageDescription": "Used for video calls",
+        "NSMicrophoneUsageDescription": "Used for voice and video calls"
+      }
+    },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      "./plugins/withIntegrity"
     ],
     "experiments": {
       "typedRoutes": true

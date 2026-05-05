@@ -46,6 +46,7 @@ export function ChatPage() {
   const { userId, username, token, privateKey, publicKey, logout } = useAuthStore()
   const [tab,     setTab]     = useState<Tab>('chats')
   const [profile, setProfile] = useState<Profile | null>(null)
+  const resolvedPublicKey = (profile?.publicKey && profile.publicKey.trim()) || publicKey || ''
 
   useEffect(() => {
     if (!token) return
@@ -91,9 +92,9 @@ export function ChatPage() {
       </nav>
 
       {/* Content */}
-      {tab === 'chats'    && <ChatsTab   userId={userId!} username={username!} token={token!} privateKey={privateKey!} publicKey={profile?.publicKey ?? publicKey ?? ''} hdr={hdr} />}
+      {tab === 'chats'    && <ChatsTab   userId={userId!} username={username!} token={token!} privateKey={privateKey!} publicKey={resolvedPublicKey} hdr={hdr} />}
       {tab === 'friends'  && <FriendsTab userId={userId!} username={username!} token={token!} hdr={hdr} />}
-      {tab === 'pending'  && <PendingTab userId={userId!} token={token!} privateKey={privateKey!} publicKey={profile?.publicKey ?? publicKey ?? ''} hdr={hdr} />}
+      {tab === 'pending'  && <PendingTab userId={userId!} token={token!} privateKey={privateKey!} publicKey={resolvedPublicKey} hdr={hdr} />}
       {tab === 'stories'  && <StoriesTab userId={userId!} username={username!} hdr={hdr} />}
       {tab === 'notes'    && <NotesTab />}
       {tab === 'calls'    && <CallsTab userId={userId!} username={username!} token={token!} hdr={hdr} />}
@@ -116,6 +117,7 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
   const [search,   setSearch]   = useState('')
   const [results,  setResults]  = useState<SearchUser[]>([])
   const [sending,  setSending]  = useState(false)
+  const [sendErr,  setSendErr]  = useState('')
   const [showNew,  setShowNew]  = useState(false)
   // Group creation
   const [grpName,  setGrpName]  = useState('')
@@ -154,7 +156,7 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
       try {
         const bundle = JSON.parse(raw.bundle)
         msg.text = await decryptMessage(bundle, userId, privateKey)
-      } catch { msg.text = '[encrypted]' }
+      } catch (err) { console.warn('[decrypt] WS message failed:', err); msg.text = '[encrypted]' }
       setMessages(prev => {
         if (prev.find(m => m.id === msg.id)) return prev
         return [...prev, msg]
@@ -178,7 +180,7 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
       try {
         const bundle = JSON.parse(m.bundle)
         m.text = await decryptMessage(bundle, userId, privateKey)
-      } catch { m.text = '[encrypted]' }
+      } catch (err) { console.warn('[decrypt] message', m.id, 'failed:', err); m.text = '[encrypted]' }
       return m
     }))
     setMessages(decrypted)
@@ -214,6 +216,7 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
     e.preventDefault()
     if (!input.trim() || !active || !privateKey || !userId) return
     setSending(true)
+    setSendErr('')
     try {
       // Fetch members on-the-fly nếu chưa load (tránh race condition)
       let currentMembers = members
@@ -221,17 +224,25 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
         const mRes = await fetch(`${API}/api/rooms/${active.id}/members`, { headers: hdr })
         if (mRes.ok) { currentMembers = await mRes.json(); setMembers(currentMembers) }
       }
+      // Self publicKey: prefer prop, fallback to member list
+      const selfMember = currentMembers.find(m => m.id === userId)
+      const myPublicKey = publicKey || selfMember?.publicKey || ''
+      if (!myPublicKey) { setSendErr('Key not loaded yet, please wait a moment'); setSending(false); return }
+
       const recipients: Array<{id:string;publicKey:string}> = []
-      recipients.push({ id: userId, publicKey })
+      recipients.push({ id: userId, publicKey: myPublicKey })
       currentMembers.filter(m => m.id !== userId && m.publicKey).forEach(m => recipients.push({ id: m.id, publicKey: m.publicKey }))
-      if (recipients.length < 2) { setSending(false); return }
+      if (recipients.length < 2) { setSendErr('Cannot find recipient keys'); setSending(false); return }
       const bundle = await encryptMessage(input.trim(), recipients)
-      await fetch(`${API}/api/messages/${active.id}`, {
+      const res = await fetch(`${API}/api/messages/${active.id}`, {
         method: 'POST', headers: { ...hdr, 'Content-Type': 'application/json' },
         body: JSON.stringify({ bundle: JSON.stringify(bundle) }),
       })
+      if (!res.ok) { setSendErr('Failed to send message'); return }
       setInput('')
       inputRef.current?.focus()
+    } catch (err) {
+      setSendErr(err instanceof Error ? err.message : 'Send failed')
     } finally { setSending(false) }
   }
 
@@ -395,10 +406,13 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
               <div ref={bottomRef} />
             </div>
 
+            {sendErr && (
+              <p className="text-red-400 text-xs px-4 py-1 bg-red-950/20 border-t border-red-900/30">{sendErr}</p>
+            )}
             <form onSubmit={sendMessage} className="flex items-center gap-3 px-4 py-3 border-t border-[#1E1E30] bg-[#0E0E1C] shrink-0">
               <input ref={inputRef}
                 className="flex-1 bg-[#12121E] border border-[#1E1E30] rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-[#4B5563] focus:outline-none focus:border-indigo-500/50 transition-colors"
-                placeholder="Write a message..." value={input} onChange={e => setInput(e.target.value)} disabled={sending} />
+                placeholder="Write a message..." value={input} onChange={e => { setInput(e.target.value); if (sendErr) setSendErr('') }} disabled={sending} />
               <button type="submit" disabled={sending || !input.trim()}
                 className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center hover:bg-indigo-500/30 transition-all disabled:opacity-30">
                 <IconSend />
@@ -562,7 +576,7 @@ function PendingTab({ userId, token, privateKey, publicKey, hdr }: {
       try {
         const bundle = JSON.parse(m.bundle)
         m.text = await decryptMessage(bundle, userId, privateKey)
-      } catch { m.text = '[encrypted — key mismatch]' }
+      } catch (err) { console.warn('[decrypt] pending msg', m.id, 'failed:', err); m.text = '[encrypted — key mismatch]' }
       return m
     }))
     setPending(decrypted)

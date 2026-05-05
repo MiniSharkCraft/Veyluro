@@ -3,7 +3,7 @@
  */
 import { storage } from './storage'
 
-const BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://amoon-eclipse.fly.dev'
+const BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080'
 export const WS_BASE = BASE.replace(/^http/, 'ws')
 
 class ApiError extends Error {
@@ -41,6 +41,7 @@ export type RoomType = {
   name: string
   type: 'dm' | 'group'
   createdAt: number
+  created_at?: number
 }
 export type MemberType = {
   id: string
@@ -61,6 +62,9 @@ export type NoteType = {
   content: string
   expiresAt: number
   createdAt: number
+  username?: string
+  expires_at?: number
+  created_at?: number
 }
 
 export const roomsApi = {

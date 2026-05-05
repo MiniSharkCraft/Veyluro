@@ -16,13 +16,13 @@ import (
 	"amoon-eclipse/server/internal/blocks"
 	"amoon-eclipse/server/internal/calls"
 	"amoon-eclipse/server/internal/config"
-	dbpkg "amoon-eclipse/server/internal/db"
 	dbcrypto "amoon-eclipse/server/internal/crypto"
+	dbpkg "amoon-eclipse/server/internal/db"
 	"amoon-eclipse/server/internal/email"
 	"amoon-eclipse/server/internal/friends"
 	"amoon-eclipse/server/internal/messages"
-	"amoon-eclipse/server/internal/moderation"
 	mw "amoon-eclipse/server/internal/middleware"
+	"amoon-eclipse/server/internal/moderation"
 	"amoon-eclipse/server/internal/notes"
 	"amoon-eclipse/server/internal/pending"
 	"amoon-eclipse/server/internal/rooms"
@@ -55,7 +55,7 @@ func main() {
 	}
 
 	// WebSocket hub
-	hub := ws.NewHub()
+	hub := ws.NewHub(db)
 	go hub.Run()
 
 	// Handlers
@@ -63,20 +63,31 @@ func main() {
 	if cfg.SMTPHost != "" && cfg.SMTPUser != "" {
 		mailer = email.NewSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPass, cfg.EmailFrom)
 	}
-	authHandler       := auth.NewHandler(db, cfg.JWTSecret, enc, hmacT, cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.FacebookAppID, mailer)
-	roomsHandler      := rooms.NewHandler(db)
-	msgsHandler       := messages.NewHandler(db, hub)
-	notesHandler      := notes.NewHandler(db)
-	friendsHandler    := friends.NewHandler(db)
-	usersHandler      := users.NewHandler(db)
-	callsHandler      := calls.NewHandler(cfg.CFTurnTokenID, cfg.CFTurnAPIToken)
+	authHandler := auth.NewHandler(
+		db,
+		cfg.JWTSecret,
+		enc,
+		hmacT,
+		cfg.GoogleClientID,
+		cfg.GoogleClientSecret,
+		cfg.GoogleRedirectURI,
+		cfg.OAuthAppRedirect,
+		cfg.FacebookAppID,
+		mailer,
+	)
+	roomsHandler := rooms.NewHandler(db)
+	msgsHandler := messages.NewHandler(db, hub)
+	notesHandler := notes.NewHandler(db)
+	friendsHandler := friends.NewHandler(db)
+	usersHandler := users.NewHandler(db, cfg.JWTSecret)
+	callsHandler := calls.NewHandler(cfg.CFTurnTokenID, cfg.CFTurnAPIToken)
 	moderationHandler := moderation.NewHandler(db)
-	pendingHandler    := pending.NewHandler(db)
-	blocksHandler     := blocks.NewHandler(db)
+	pendingHandler := pending.NewHandler(db)
+	blocksHandler := blocks.NewHandler(db)
 
 	// Router
 	r := chi.NewRouter()
-	r.Use(mw.BlockScanners)           // FIRST: auto-ban IP quét lỗ hổng (trước cả logger)
+	r.Use(mw.BlockScanners) // FIRST: auto-ban IP quét lỗ hổng (trước cả logger)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -84,6 +95,16 @@ func main() {
 	r.Use(middleware.Timeout(30 * time.Second))
 	r.Use(mw.SecurityHeaders)
 	r.Use(mw.MaxBodySize(512 * 1024))
+
+	// Request integrity — validates X-App-Sum, X-Nonce, X-Timestamp, X-Signature
+	// Only enforced when HMAC_SIGNING_KEY is set (opt-in for gradual rollout)
+	if cfg.HMACSigningKey != "" {
+		r.Use(mw.RequestIntegrity(mw.IntegrityConfig{
+			HMACSigningKey:  cfg.HMACSigningKey,
+			ExpectedAppSums: cfg.ExpectedAppSums,
+			SkipInDevMode:   cfg.Env == "development",
+		}))
+	}
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"status":"ok"}`))
@@ -205,7 +226,7 @@ func corsMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
 			}
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-App-Sum, X-Nonce, X-Timestamp, X-Signature, X-Platform")
 			w.Header().Set("Access-Control-Max-Age", "86400")
 
 			if r.Method == http.MethodOptions {

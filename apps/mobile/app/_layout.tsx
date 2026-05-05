@@ -42,7 +42,7 @@ export default function RootLayout() {
         screenOptions={{
           headerStyle: { backgroundColor: '#0D0D14' },
           headerTintColor: '#00FFFF',
-          headerTitleStyle: { fontFamily: 'JetBrainsMono', fontSize: 14, letterSpacing: 2 },
+          headerTitleStyle: { fontFamily: 'JetBrainsMono', fontSize: 14 },
           contentStyle: { backgroundColor: '#050508' },
           animation: 'fade',
         }}

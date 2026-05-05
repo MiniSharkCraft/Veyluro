@@ -6,10 +6,6 @@ export function AppName() {
   return window['go']['main']['App']['AppName']();
 }
 
-export function ExchangeGoogleToken(arg1, arg2) {
-  return window['go']['main']['App']['ExchangeGoogleToken'](arg1, arg2);
-}
-
-export function StartGoogleOAuth() {
-  return window['go']['main']['App']['StartGoogleOAuth']();
+export function StartGoogleOAuth(arg1) {
+  return window['go']['main']['App']['StartGoogleOAuth'](arg1);
 }

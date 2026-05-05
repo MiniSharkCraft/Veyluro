@@ -14,8 +14,42 @@ import {
   importRsaPrivateKey, publicKeyFingerprint,
   encryptPrivateKeyWithPassphrase,
 } from '../../src/lib/crypto'
+import { API_BASE_URL } from '../../src/lib/runtimeConfig'
 
-const API = process.env.EXPO_PUBLIC_API_URL ?? process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080'
+const API = API_BASE_URL
+
+function mapOAuthError(code: string) {
+  switch (code) {
+    case 'google_not_configured':
+      return 'Server chưa cấu hình Google OAuth. Cần set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET và GOOGLE_REDIRECT_URI.'
+    case 'cancelled':
+      return 'Đăng nhập Google đã bị hủy.'
+    default:
+      return code
+  }
+}
+
+async function parseResponseBody(res: Response): Promise<unknown> {
+  const text = await res.text()
+  if (!text) return null
+  try {
+    return JSON.parse(text) as unknown
+  } catch {
+    return text
+  }
+}
+
+function responseErrorMessage(body: unknown, status: number) {
+  if (body && typeof body === 'object') {
+    return (body as { error?: string; message?: string }).error
+      ?? (body as { error?: string; message?: string }).message
+      ?? `Server ${status}`
+  }
+  if (typeof body === 'string' && body.trim().startsWith('<')) {
+    return `Server trả về HTML thay vì JSON (${status}). Kiểm tra lại API URL/reverse proxy.`
+  }
+  return typeof body === 'string' && body.trim() ? body : `Server ${status}`
+}
 
 async function setupAndSaveKey(userId: string, token: string, passphrase?: string) {
   const existing = await SecureStore.getItemAsync(`privateKey_${userId}`)
@@ -79,7 +113,7 @@ export default function LoginScreen() {
       if (result.type !== 'success') { setLoading(null); return }
       const { queryParams } = Linking.parse(result.url)
       if (!queryParams) { setLoading(null); return }
-      if (queryParams.error) throw new Error(String(queryParams.error))
+      if (queryParams.error) throw new Error(mapOAuthError(String(queryParams.error)))
       const { token, userId, username } = queryParams as Record<string, string>
       await setupAndSaveKey(userId, token, passphrase || undefined)
       await Promise.all([
@@ -115,11 +149,11 @@ export default function LoginScreen() {
           body: JSON.stringify({ username: username.trim(), email: email.trim(), password, publicKey, fingerprint }),
         })
         if (!res.ok) {
-          const body = await res.json()
-          console.error('[register 400]', JSON.stringify(body))
-          throw new Error(body.error ?? body.message ?? `Server ${res.status}`)
+          const body = await parseResponseBody(res)
+          console.error('[register error]', body)
+          throw new Error(responseErrorMessage(body, res.status))
         }
-        const data = await res.json() as { token: string; userId: string; username: string }
+        const data = await parseResponseBody(res) as { token: string; userId: string; username: string }
         await SecureStore.setItemAsync(`privateKey_${data.userId}`, privateKey)
         const { encryptedKey, keySalt } = await encryptPrivateKeyWithPassphrase(privateKey, passphrase)
         await fetch(`${API}/api/auth/store-encrypted-key`, {
@@ -139,11 +173,11 @@ export default function LoginScreen() {
           body: JSON.stringify({ username: username.trim(), password }),
         })
         if (!res.ok) {
-          const body = await res.json()
-          console.error('[login 400]', JSON.stringify(body))
-          throw new Error(body.error ?? body.message ?? `Server ${res.status}`)
+          const body = await parseResponseBody(res)
+          console.error('[login error]', body)
+          throw new Error(responseErrorMessage(body, res.status))
         }
-        const data = await res.json() as { token: string; userId: string; id: string; username: string }
+        const data = await parseResponseBody(res) as { token: string; userId: string; id: string; username: string }
         const uid = data.userId ?? data.id
         const pk = await SecureStore.getItemAsync(`privateKey_${uid}`)
         await Promise.all([
@@ -172,8 +206,8 @@ export default function LoginScreen() {
         body: JSON.stringify({ email: fpEmail.trim() }),
       })
       if (!res.ok) {
-        const body = await res.json()
-        throw new Error(body.error ?? `Lỗi ${res.status}`)
+        const body = await parseResponseBody(res)
+        throw new Error(responseErrorMessage(body, res.status))
       }
       Alert.alert('Đã gửi', 'Kiểm tra email — username được gửi về hộp thư của bạn')
       setScreen('main')
@@ -193,8 +227,8 @@ export default function LoginScreen() {
         body: JSON.stringify({ email: fpEmail.trim() }),
       })
       if (!res.ok) {
-        const body = await res.json()
-        throw new Error(body.error ?? body.message ?? `Lỗi ${res.status}`)
+        const body = await parseResponseBody(res)
+        throw new Error(responseErrorMessage(body, res.status))
       }
       setFpStep('otp')
       Alert.alert('Đã gửi', 'Kiểm tra email lấy mã OTP (10 phút)')
@@ -211,7 +245,10 @@ export default function LoginScreen() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: fpEmail, otp: fpOtp, password: fpNewPass }),
       })
-      if (!res.ok) throw new Error(((await res.json()) as { error: string }).error)
+      if (!res.ok) {
+        const body = await parseResponseBody(res)
+        throw new Error(responseErrorMessage(body, res.status))
+      }
       Alert.alert('Thành công', 'Mật khẩu đã được đặt lại')
       setScreen('main'); setFpStep('email'); setFpEmail(''); setFpOtp(''); setFpNewPass('')
     } catch (err: unknown) {

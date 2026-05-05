@@ -55,9 +55,11 @@ export default function SettingsScreen() {
       if (newDisplayName.trim() !== (profile?.displayName ?? '')) updates.displayName = newDisplayName.trim()
       if (newBio.trim() !== (profile?.bio ?? '')) updates.bio = newBio.trim()
       if (Object.keys(updates).length === 0) { setEditModal(false); return }
-      await usersApi.updateProfile(updates)
+      const res = await usersApi.updateProfile(updates)
       if (updates.username) {
-        await storage.setSession(profile!.id, updates.username, (await storage.getToken())!)
+        const nextUsername = res.username ?? updates.username
+        const nextToken = res.token ?? (await storage.getToken()) ?? ''
+        await storage.setSession(profile!.id, nextUsername, nextToken)
       }
       await load()
       setEditModal(false)

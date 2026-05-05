@@ -4,9 +4,9 @@ import {
   mediaDevices,
 } from 'react-native-webrtc'
 import * as SecureStore from 'expo-secure-store'
+import { API_BASE_URL } from '../lib/runtimeConfig'
 
-const API = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080'
-const WS_URL = ((process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080').replace(/^http/, 'ws') + '/ws')
+const API = API_BASE_URL
 
 export type CallState = 'idle' | 'calling' | 'ringing' | 'active' | 'ended'
 

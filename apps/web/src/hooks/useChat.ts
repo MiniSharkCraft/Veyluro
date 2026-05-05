@@ -128,9 +128,6 @@ export function useChat(roomId: string) {
       const bundle = await encryptMessage(text, recipients)
       const bundleStr = JSON.stringify(bundle)
       const { id } = await messagesApi.send(roomId, bundleStr)
-      if (ws.current?.readyState === WebSocket.OPEN) {
-        ws.current.send(JSON.stringify({ type: 'message', data: { id, senderId: session.userId, bundle: bundleStr } }))
-      }
       setMessages(prev => prev.map(m => m.id === tempId ? { ...m, id, status: 'delivered', pending: false } : m))
     } catch (err) {
       console.error('[useChat] send:', err)

@@ -28,12 +28,47 @@ type Handler struct {
 	hmac                 *dbcrypto.HmacTokener
 	googleClientID       string
 	googleClientSecret   string
+	googleRedirectURI    string
+	oauthAppRedirect     string
 	facebookAppID        string
 	mailer               *email.Sender
 }
 
-func NewHandler(db *sql.DB, jwtSecret string, enc *dbcrypto.FieldEncryptor, hmac *dbcrypto.HmacTokener, googleClientID, googleClientSecret, facebookAppID string, mailer *email.Sender) *Handler {
-	return &Handler{db: db, jwtSecret: jwtSecret, enc: enc, hmac: hmac, googleClientID: googleClientID, googleClientSecret: googleClientSecret, facebookAppID: facebookAppID, mailer: mailer}
+func (h *Handler) googleOAuthReady() bool {
+	return strings.TrimSpace(h.googleClientID) != "" && strings.TrimSpace(h.googleRedirectURI) != ""
+}
+
+func (h *Handler) oauthRedirectTarget() string {
+	if t := strings.TrimSpace(h.oauthAppRedirect); t != "" {
+		return t
+	}
+	return "amoon-eclipse://auth"
+}
+
+func (h *Handler) redirectOAuthError(w http.ResponseWriter, r *http.Request, code string) {
+	http.Redirect(w, r, h.oauthRedirectTarget()+"?error="+url.QueryEscape(code), http.StatusFound)
+}
+
+func NewHandler(
+	db *sql.DB,
+	jwtSecret string,
+	enc *dbcrypto.FieldEncryptor,
+	hmac *dbcrypto.HmacTokener,
+	googleClientID, googleClientSecret, googleRedirectURI, oauthAppRedirect, facebookAppID string,
+	mailer *email.Sender,
+) *Handler {
+	return &Handler{
+		db:                 db,
+		jwtSecret:          jwtSecret,
+		enc:                enc,
+		hmac:               hmac,
+		googleClientID:     googleClientID,
+		googleClientSecret: googleClientSecret,
+		googleRedirectURI:  googleRedirectURI,
+		oauthAppRedirect:   oauthAppRedirect,
+		facebookAppID:      facebookAppID,
+		mailer:             mailer,
+	}
 }
 
 func (h *Handler) Routes() chi.Router {
@@ -536,12 +571,15 @@ func (h *Handler) getEncryptedKey(w http.ResponseWriter, r *http.Request) {
 
 // ── Google OAuth server-side ───────────────────────────────────────────────
 
-const googleRedirectURI = "https://engine.congmc.com/api/auth/google/callback"
-
 func (h *Handler) googleStart(w http.ResponseWriter, r *http.Request) {
+	if !h.googleOAuthReady() {
+		h.redirectOAuthError(w, r, "google_not_configured")
+		return
+	}
+
 	params := url.Values{
 		"client_id":     {h.googleClientID},
-		"redirect_uri":  {googleRedirectURI},
+		"redirect_uri":  {h.googleRedirectURI},
 		"response_type": {"code"},
 		"scope":         {"openid email profile"},
 		"access_type":   {"offline"},
@@ -550,9 +588,14 @@ func (h *Handler) googleStart(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) googleCallback(w http.ResponseWriter, r *http.Request) {
+	if !h.googleOAuthReady() || strings.TrimSpace(h.googleClientSecret) == "" {
+		h.redirectOAuthError(w, r, "google_not_configured")
+		return
+	}
+
 	code := r.URL.Query().Get("code")
 	if code == "" {
-		http.Redirect(w, r, "amoon-eclipse:///auth?error=cancelled", http.StatusFound)
+		h.redirectOAuthError(w, r, "cancelled")
 		return
 	}
 
@@ -561,11 +604,11 @@ func (h *Handler) googleCallback(w http.ResponseWriter, r *http.Request) {
 		"code":          {code},
 		"client_id":     {h.googleClientID},
 		"client_secret": {h.googleClientSecret},
-		"redirect_uri":  {googleRedirectURI},
+		"redirect_uri":  {h.googleRedirectURI},
 		"grant_type":    {"authorization_code"},
 	})
 	if err != nil {
-		http.Redirect(w, r, "amoon-eclipse:///auth?error=token_exchange", http.StatusFound)
+		h.redirectOAuthError(w, r, "token_exchange")
 		return
 	}
 	defer resp.Body.Close()
@@ -574,7 +617,7 @@ func (h *Handler) googleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewDecoder(resp.Body).Decode(&tokenRes)
 	if tokenRes.AccessToken == "" {
-		http.Redirect(w, r, "amoon-eclipse:///auth?error=no_token", http.StatusFound)
+		h.redirectOAuthError(w, r, "no_token")
 		return
 	}
 
@@ -583,7 +626,7 @@ func (h *Handler) googleCallback(w http.ResponseWriter, r *http.Request) {
 	req.Header.Set("Authorization", "Bearer "+tokenRes.AccessToken)
 	infoResp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		http.Redirect(w, r, "amoon-eclipse:///auth?error=userinfo", http.StatusFound)
+		h.redirectOAuthError(w, r, "userinfo")
 		return
 	}
 	defer infoResp.Body.Close()
@@ -594,7 +637,7 @@ func (h *Handler) googleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewDecoder(infoResp.Body).Decode(&info)
 	if info.Sub == "" {
-		http.Redirect(w, r, "amoon-eclipse:///auth?error=no_user", http.StatusFound)
+		h.redirectOAuthError(w, r, "no_user")
 		return
 	}
 
@@ -620,13 +663,13 @@ func (h *Handler) googleCallback(w http.ResponseWriter, r *http.Request) {
 			userID, username, "google", info.Sub, nullStr(emailEnc), nullStr(emailToken),
 		)
 	} else if err != nil {
-		http.Redirect(w, r, "amoon-eclipse:///auth?error=db", http.StatusFound)
+		h.redirectOAuthError(w, r, "db")
 		return
 	}
 
 	token, err := SignJWT(userID, username, h.jwtSecret)
 	if err != nil {
-		http.Redirect(w, r, "amoon-eclipse:///auth?error=jwt", http.StatusFound)
+		h.redirectOAuthError(w, r, "jwt")
 		return
 	}
 
@@ -635,7 +678,7 @@ func (h *Handler) googleCallback(w http.ResponseWriter, r *http.Request) {
 		"userId":   {userID},
 		"username": {username},
 	}
-	http.Redirect(w, r, "amoon-eclipse:///auth?"+params.Encode(), http.StatusFound)
+	http.Redirect(w, r, h.oauthRedirectTarget()+"?"+params.Encode(), http.StatusFound)
 }
 
 // ── Forgot username ────────────────────────────────────────────────────────

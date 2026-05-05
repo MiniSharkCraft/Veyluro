@@ -12,7 +12,7 @@ import {
 import { router } from 'expo-router'
 import * as SecureStore from 'expo-secure-store'
 
-const API = process.env.EXPO_PUBLIC_API_URL ?? 'https://amoon-eclipse.fly.dev'
+const API = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080'
 
 async function decryptPrivateKeyWithPassphrase(encryptedKeyJson: string, passphrase: string): Promise<string> {
   const { salt, iv, ct } = JSON.parse(encryptedKeyJson)

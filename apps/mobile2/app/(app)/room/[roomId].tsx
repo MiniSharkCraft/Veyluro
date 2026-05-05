@@ -11,7 +11,7 @@ import { useVoiceCall } from '../../../src/hooks/useVoiceCall'
 import { useGroupCall } from '../../../src/hooks/useGroupCall'
 import CallScreen from '../../../src/components/CallScreen'
 import GroupCallScreen from '../../../src/components/GroupCallScreen'
-import { moderationApi, blocksApi, type MemberType } from '../../../src/lib/api'
+import { moderationApi, blocksApi, roomsApi, type MemberType } from '../../../src/lib/api'
 import { useRooms } from '../../../src/hooks/useRooms'
 
 const COLORS = ['#4C1D95','#1E3A5F','#831843','#064E3B','#7C2D12','#1E293B']
@@ -92,7 +92,6 @@ export default function RoomScreen() {
   }
 
   const otherMember = members.find(m => m.id !== myId)
-  const callRoomId = [myId, otherMember?.id].filter(Boolean).sort().join('_')
 
   const handleReport = async () => {
     if (!reportReason || !reportTarget) return
@@ -192,7 +191,7 @@ export default function RoomScreen() {
         {roomType === 'dm' && otherMember && callState === 'idle' && groupCallState === 'idle' && (
           <TouchableOpacity
             style={s.headerBtn}
-            onPress={() => startCall(otherMember.id, otherMember.username, callRoomId)}
+            onPress={() => startCall(otherMember.id, otherMember.username, roomId)}
             activeOpacity={0.7}
           >
             <Text style={s.headerBtnIco}>📞</Text>

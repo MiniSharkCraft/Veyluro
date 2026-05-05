@@ -16,9 +16,14 @@ import (
 	"github.com/pquerna/otp/totp"
 )
 
-type Handler struct{ db *sql.DB }
+type Handler struct {
+	db        *sql.DB
+	jwtSecret string
+}
 
-func NewHandler(db *sql.DB) *Handler { return &Handler{db: db} }
+func NewHandler(db *sql.DB, jwtSecret string) *Handler {
+	return &Handler{db: db, jwtSecret: jwtSecret}
+}
 
 func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
@@ -106,6 +111,7 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	updatedUsername := ""
 	if req.Username != nil {
 		newUsername := strings.TrimSpace(*req.Username)
 		if len(newUsername) < 3 || len(newUsername) > 30 {
@@ -119,23 +125,44 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, "username đã được dùng", http.StatusConflict)
 			return
 		}
-		h.db.ExecContext(r.Context(), `UPDATE users SET username=? WHERE id=?`, newUsername, me)
+		if _, err := h.db.ExecContext(r.Context(), `UPDATE users SET username=? WHERE id=?`, newUsername, me); err != nil {
+			jsonError(w, "db error", http.StatusInternalServerError)
+			return
+		}
+		updatedUsername = newUsername
 	}
 	if req.DisplayName != nil {
 		name := strings.TrimSpace(*req.DisplayName)
 		if len(name) > 50 {
 			name = name[:50]
 		}
-		h.db.ExecContext(r.Context(), `UPDATE users SET display_name=? WHERE id=?`, name, me)
+		if _, err := h.db.ExecContext(r.Context(), `UPDATE users SET display_name=? WHERE id=?`, name, me); err != nil {
+			jsonError(w, "db error", http.StatusInternalServerError)
+			return
+		}
 	}
 	if req.Bio != nil {
 		bio := strings.TrimSpace(*req.Bio)
 		if len(bio) > 200 {
 			bio = bio[:200]
 		}
-		h.db.ExecContext(r.Context(), `UPDATE users SET bio=? WHERE id=?`, bio, me)
+		if _, err := h.db.ExecContext(r.Context(), `UPDATE users SET bio=? WHERE id=?`, bio, me); err != nil {
+			jsonError(w, "db error", http.StatusInternalServerError)
+			return
+		}
 	}
-	jsonOK(w, map[string]string{"status": "ok"})
+
+	resp := map[string]string{"status": "ok"}
+	if updatedUsername != "" {
+		token, err := auth.SignJWT(me, updatedUsername, h.jwtSecret)
+		if err != nil {
+			jsonError(w, "token error", http.StatusInternalServerError)
+			return
+		}
+		resp["username"] = updatedUsername
+		resp["token"] = token
+	}
+	jsonOK(w, resp)
 }
 
 // GET /api/users/invite-link — get or create invite link

@@ -50,8 +50,12 @@ type Config struct {
 	DBHmacKey        string // 64-char hex = 32 bytes, HMAC-SHA256 email token
 	AllowedOrigins   []string
 	Env              string
+	HMACSigningKey   string   // JS request signing key (matches secureRequest.ts SIG_KEY)
+	ExpectedAppSums  []string // Valid X-App-Sum values for release APK/IPA
 	GoogleClientID     string // Web client ID
 	GoogleClientSecret string // Web client secret
+	GoogleRedirectURI  string // OAuth redirect URI
+	OAuthAppRedirect   string // Deep-link URI về app, vd: amoon-eclipse://auth
 	CFTurnTokenID      string // Cloudflare TURN token ID
 	CFTurnAPIToken     string // Cloudflare TURN API token
 	FacebookAppID    string // App ID để verify token
@@ -73,9 +77,13 @@ func Load() *Config {
 		DBHmacKey:       mustEnv("DB_HMAC_KEY"),
 		AllowedOrigins:  origins,
 		Env:             getEnv("ENV", "production"),
-		GoogleClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
-		GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
-		CFTurnTokenID:      getEnv("CF_TURN_TOKEN_ID", ""),
+		HMACSigningKey:  getEnv("HMAC_SIGNING_KEY", ""),
+		ExpectedAppSums: splitCSV(getEnv("EXPECTED_APP_SUMS", "")),
+			GoogleClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
+			GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
+			GoogleRedirectURI:  getEnv("GOOGLE_REDIRECT_URI", "http://localhost:8080/api/auth/google/callback"),
+			OAuthAppRedirect:   getEnv("OAUTH_APP_REDIRECT", "amoon-eclipse://auth"),
+			CFTurnTokenID:      getEnv("CF_TURN_TOKEN_ID", ""),
 		CFTurnAPIToken:     getEnv("CF_TURN_API_TOKEN", ""),
 		FacebookAppID:   getEnv("FACEBOOK_APP_ID", ""),
 		SMTPHost:        getEnv("SMTP_HOST", ""),
@@ -84,6 +92,20 @@ func Load() *Config {
 		SMTPPass:        getEnv("SMTP_PASS", ""),
 		EmailFrom:       getEnv("EMAIL_FROM", "AMoon Eclipse <noreply@amoon-eclipse.app>"),
 	}
+}
+
+func splitCSV(s string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 func getEnv(key, fallback string) string {

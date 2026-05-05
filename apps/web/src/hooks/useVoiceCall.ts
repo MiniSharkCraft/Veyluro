@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { API_BASE_URL } from '../lib/runtimeConfig'
 
-const API = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080'
+const API = API_BASE_URL
 
 export type CallState = 'idle' | 'calling' | 'ringing' | 'active' | 'ended'
 
