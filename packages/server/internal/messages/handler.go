@@ -3,12 +3,17 @@ package messages
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"amoon-eclipse/server/internal/auth"
 	"amoon-eclipse/server/internal/moderation"
+	"amoon-eclipse/server/internal/r2"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -17,19 +22,24 @@ import (
 // Hub interface để tránh circular import
 type Hub interface {
 	BroadcastToRoom(roomID string, data []byte)
+	BroadcastToRoomMemberGlobals(roomID string, data []byte)
 }
 
 type Handler struct {
 	db  *sql.DB
 	hub Hub
+	r2  *r2.Client
 }
 
-func NewHandler(db *sql.DB, hub Hub) *Handler {
-	return &Handler{db: db, hub: hub}
+const maxImageAttachmentBytes = 50 * 1024 * 1024
+
+func NewHandler(db *sql.DB, hub Hub, r2Client *r2.Client) *Handler {
+	return &Handler{db: db, hub: hub, r2: r2Client}
 }
 
 func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
+	r.Post("/{roomId}/attachments", h.uploadAttachment)
 	r.Get("/{roomId}", h.list)
 	r.Post("/{roomId}", h.send)
 	return r
@@ -101,6 +111,16 @@ type sendReq struct {
 	ClientID string `json:"clientId,omitempty"` // client-generated optimistic ID
 }
 
+type attachmentResp struct {
+	Kind     string `json:"kind"`
+	URL      string `json:"url"`
+	ThumbURL string `json:"thumbUrl,omitempty"`
+	Key      string `json:"key"`
+	Mime     string `json:"mime"`
+	Size     int64  `json:"size"`
+	Name     string `json:"name,omitempty"`
+}
+
 func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(auth.ContextKeyUserID).(string)
 	roomID := chi.URLParam(r, "roomId")
@@ -150,6 +170,14 @@ func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 			"createdAt": now,
 		})
 		go h.hub.BroadcastToRoom(roomID, wsMsg)
+
+		roomEvent, _ := json.Marshal(map[string]any{
+			"type":      "room-updated",
+			"roomId":    roomID,
+			"senderId":  userID,
+			"createdAt": now,
+		})
+		go h.hub.BroadcastToRoomMemberGlobals(roomID, roomEvent)
 	}
 
 	// Track harassment: find the other member in DM room and track
@@ -176,6 +204,110 @@ func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, map[string]string{"id": id, "clientId": req.ClientID})
+}
+
+// POST /api/messages/{roomId}/attachments — multipart field "image" hoặc "file", max 50MB.
+func (h *Handler) uploadAttachment(w http.ResponseWriter, r *http.Request) {
+	if h.r2 == nil {
+		jsonError(w, "R2 chưa cấu hình", http.StatusServiceUnavailable)
+		return
+	}
+	userID := r.Context().Value(auth.ContextKeyUserID).(string)
+	roomID := chi.URLParam(r, "roomId")
+	if !isMember(h.db, r, roomID, userID) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	if banned, until := moderation.CheckBanned(h.db, userID); banned {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]any{
+			"error":       "bạn đang bị hạn chế chat",
+			"bannedUntil": until,
+		})
+		return
+	}
+
+	log.Printf("[attachment] upload start user=%s room=%s contentLength=%d contentType=%q", userID, roomID, r.ContentLength, r.Header.Get("Content-Type"))
+	if err := r.ParseMultipartForm(maxImageAttachmentBytes + 1024*1024); err != nil {
+		log.Printf("[attachment] multipart parse failed user=%s room=%s err=%v", userID, roomID, err)
+		jsonError(w, "ảnh quá lớn hoặc multipart không hợp lệ", http.StatusBadRequest)
+		return
+	}
+	file, header, err := r.FormFile("image")
+	if err != nil {
+		file, header, err = r.FormFile("file")
+	}
+	if err != nil {
+		jsonError(w, "thiếu file ảnh", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	if header.Size > maxImageAttachmentBytes {
+		jsonError(w, "ảnh tối đa 50MB", http.StatusRequestEntityTooLarge)
+		return
+	}
+	data, err := io.ReadAll(io.LimitReader(file, maxImageAttachmentBytes+1))
+	if err != nil {
+		jsonError(w, "không đọc được file", http.StatusBadRequest)
+		return
+	}
+	if len(data) == 0 {
+		jsonError(w, "file rỗng", http.StatusBadRequest)
+		return
+	}
+	if len(data) > maxImageAttachmentBytes {
+		jsonError(w, "ảnh tối đa 50MB", http.StatusRequestEntityTooLarge)
+		return
+	}
+	contentType, ext, ok := detectImageAttachmentType(data, header.Header.Get("Content-Type"), header.Filename)
+	if !ok {
+		jsonError(w, "chỉ hỗ trợ JPEG, PNG, WebP hoặc GIF", http.StatusBadRequest)
+		return
+	}
+
+	key := fmt.Sprintf("attachments/%s/%s/%s%s", roomID, userID, uuid.NewString(), ext)
+	url, err := h.r2.PutObject(r.Context(), key, contentType, data)
+	if err != nil {
+		log.Printf("[attachment] R2 upload failed user=%s room=%s key=%s type=%s size=%d err=%v", userID, roomID, key, contentType, len(data), err)
+		jsonError(w, "upload R2 thất bại", http.StatusBadGateway)
+		return
+	}
+	log.Printf("[attachment] upload ok user=%s room=%s key=%s type=%s size=%d", userID, roomID, key, contentType, len(data))
+	jsonOK(w, attachmentResp{
+		Kind:     "image",
+		URL:      url,
+		ThumbURL: h.r2.TransformURL(key, 720, 720),
+		Key:      key,
+		Mime:     contentType,
+		Size:     int64(len(data)),
+		Name:     header.Filename,
+	})
+}
+
+func detectImageAttachmentType(data []byte, declaredType, filename string) (contentType string, ext string, ok bool) {
+	detected := http.DetectContentType(data)
+	switch detected {
+	case "image/jpeg":
+		return detected, ".jpg", true
+	case "image/png":
+		return detected, ".png", true
+	case "image/gif":
+		return detected, ".gif", true
+	}
+	if len(data) >= 12 && string(data[0:4]) == "RIFF" && string(data[8:12]) == "WEBP" {
+		return "image/webp", ".webp", true
+	}
+	declaredType = strings.ToLower(strings.TrimSpace(strings.Split(declaredType, ";")[0]))
+	lowerName := strings.ToLower(filename)
+	if declaredType == "image/heic" || declaredType == "image/heif" || strings.HasSuffix(lowerName, ".heic") || strings.HasSuffix(lowerName, ".heif") {
+		if declaredType == "" {
+			declaredType = "image/heic"
+		}
+		return declaredType, ".heic", true
+	}
+	return "", "", false
 }
 
 func isMember(db *sql.DB, r *http.Request, roomID, userID string) bool {

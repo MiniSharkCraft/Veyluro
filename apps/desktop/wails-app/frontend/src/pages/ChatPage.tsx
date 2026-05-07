@@ -49,8 +49,8 @@ function EmptyState({ icon, text, sub }: { icon: string; text: string; sub?: str
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-8 text-center gap-2">
       <span className="text-4xl opacity-30">{icon}</span>
-      <p className="text-white text-sm font-medium">{text}</p>
-      {sub && <p className="text-dark-400/60 text-xs">{sub}</p>}
+      <p className="text-[var(--app-text)] text-sm font-medium">{text}</p>
+      {sub && <p className="text-[var(--app-text-faint)] text-xs">{sub}</p>}
     </div>
   )
 }
@@ -108,7 +108,7 @@ export function ChatPage() {
       </nav>
 
       {/* Content */}
-      {tab === 'chats'    && <ChatsTab   userId={userId!} username={username!} token={token!} privateKey={privateKey!} publicKey={resolvedPublicKey} hdr={hdr} />}
+      {tab === 'chats'    && <ChatsTab   userId={userId!} username={username!} token={token!} privateKey={privateKey!} publicKey={resolvedPublicKey} hdr={hdr} onOpenNotes={() => setTab('notes')} />}
       {tab === 'friends'  && <FriendsTab userId={userId!} username={username!} token={token!} hdr={hdr} />}
       {tab === 'pending'  && <PendingTab userId={userId!} token={token!} privateKey={privateKey!} publicKey={resolvedPublicKey} hdr={hdr} />}
       {tab === 'stories'  && <StoriesTab userId={userId!} username={username!} hdr={hdr} />}
@@ -121,9 +121,10 @@ export function ChatPage() {
 }
 
 // ─── CHATS TAB ────────────────────────────────────────────────────────────────
-function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
+function ChatsTab({ userId, username, token, privateKey, publicKey, hdr, onOpenNotes }: {
   userId: string; username: string; token: string
   privateKey: CryptoKey; publicKey: string; hdr: Record<string, string>
+  onOpenNotes: () => void
 }) {
   const [rooms,    setRooms]    = useState<Room[]>([])
   const [active,   setActive]   = useState<Room | null>(null)
@@ -275,6 +276,14 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
     return d.toLocaleDateString('vi-VN', { day:'2-digit', month:'2-digit' })
   }
 
+  const searchTerm = search.trim().toLowerCase()
+  const filteredRooms = searchTerm
+    ? rooms.filter(r => {
+        const display = roomDisplayName(r).toLowerCase()
+        return display.includes(searchTerm) || r.name.toLowerCase().includes(searchTerm)
+      })
+    : rooms
+
   const activeDisplayName = active ? roomDisplayName(active) : ''
 
   return (
@@ -298,7 +307,7 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
 
         <div className="px-4 pb-4 border-b border-[var(--app-border-soft)]">
           <div className="flex gap-4 overflow-x-auto pb-1">
-            <button className="w-[68px] shrink-0 text-left">
+            <button onClick={onOpenNotes} className="w-[68px] shrink-0 text-left">
               <div className="w-14 h-14 rounded-full bg-[var(--app-panel-2)] flex items-center justify-center mb-2">
                 <Plus size={20} weight="bold" className="text-[var(--app-text)]" />
               </div>
@@ -334,7 +343,7 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
         )}
 
         {/* New chat / group panel */}
-        {showNew && results.length === 0 && (
+        {showNew && results.length === 0 && !searchTerm && (
           <div className="border-b border-[var(--app-border-soft)] p-3 space-y-2">
             <div className="flex gap-1.5 mb-2">
               <button onClick={() => setGrpMode(false)} className={`flex-1 py-1 text-xs rounded-lg ${!grpMode ? 'bg-[var(--app-brand-soft)] text-[var(--app-brand)]' : 'text-[var(--app-text-faint)] hover:text-[var(--app-text)]'}`}>DM</button>
@@ -379,7 +388,10 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
           {rooms.length === 0 && (
             <EmptyState icon="💬" text="No conversations" sub="Search for someone above" />
           )}
-          {rooms.map(r => (
+          {rooms.length > 0 && filteredRooms.length === 0 && (
+            <EmptyState icon="💬" text="No matching chats" sub="Try another name or username" />
+          )}
+          {filteredRooms.map(r => (
             <button key={r.id} onClick={() => openRoom(r)}
               className={`w-full flex items-center gap-3 px-3 py-3 rounded-2xl transition-colors ${
                 active?.id === r.id ? 'bg-[var(--app-brand-soft)] text-[var(--app-brand)]' : 'hover:bg-[var(--app-panel-2)]'
@@ -432,16 +444,16 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
                     {!mine && <Avatar name={sender?.username ?? m.senderId.slice(0,6)} size={28} />}
                     <div className={`max-w-[65%] ${mine ? 'items-end' : 'items-start'} flex flex-col gap-0.5`}>
                       {!mine && active.type === 'group' && (
-                        <p className="text-[10px] text-[#4B5563] px-1">{sender?.username ?? '?'}</p>
+                        <p className="text-[10px] text-[var(--app-text-faint)] px-1">{sender?.username ?? '?'}</p>
                       )}
                       <div className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                         mine
-                          ? 'bg-indigo-500/20 border border-indigo-500/30 text-white rounded-br-sm'
-                          : 'bg-[#12121E] border border-[#1E1E30] text-white rounded-bl-sm'
+                          ? 'bg-indigo-500/20 border border-indigo-500/30 text-[var(--app-text)] rounded-br-sm'
+                          : 'bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] text-[var(--app-text)] rounded-bl-sm'
                       }`}>
                         {m.text ?? '[encrypted]'}
                       </div>
-                      <p className="text-[10px] text-[#4B5563] px-1">{fmt(m.createdAt)}</p>
+                      <p className="text-[10px] text-[var(--app-text-faint)] px-1">{fmt(m.createdAt)}</p>
                     </div>
                   </div>
                 )
@@ -464,11 +476,11 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-center gap-3">
-            <div className="w-20 h-20 rounded-full bg-[#12121E] border border-[#1E1E30] flex items-center justify-center">
+            <div className="w-20 h-20 rounded-full bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] flex items-center justify-center">
               <IconChat size={32} />
             </div>
-            <p className="text-white font-semibold">Your Messages</p>
-            <p className="text-[#4B5563] text-sm max-w-xs">Send encrypted messages. Select a conversation or start a new one.</p>
+            <p className="text-[var(--app-text)] font-semibold">Your Messages</p>
+            <p className="text-[var(--app-text-faint)] text-sm max-w-xs">Send encrypted messages. Select a conversation or start a new one.</p>
           </div>
         )}
       </div>
@@ -526,13 +538,13 @@ function FriendsTab({ userId: _userId, username: _username, token, hdr }: { user
 
   return (
     <>
-      <div className="w-72 shrink-0 border-r border-[#1E1E30] flex flex-col bg-[#0E0E1C]">
-        <div className="p-4 border-b border-[#1E1E30]">
-          <h2 className="text-white font-bold text-base mb-3">Friends</h2>
+      <div className="w-72 shrink-0 border-r border-[var(--app-border-soft)] flex flex-col bg-[var(--app-panel)]">
+        <div className="p-4 border-b border-[var(--app-border-soft)]">
+          <h2 className="text-[var(--app-text)] font-bold text-base mb-3">Friends</h2>
           <div className="flex gap-1.5">
             {(['all','requests','find'] as const).map(k => (
               <button key={k} onClick={() => setSub(k)}
-                className={`flex-1 py-1.5 text-xs rounded-lg transition-all capitalize ${sub === k ? 'bg-indigo-500/20 text-indigo-400' : 'text-[#4B5563] hover:text-white hover:bg-[#1E1E30]'}`}>
+                className={`flex-1 py-1.5 text-xs rounded-lg transition-all capitalize ${sub === k ? 'bg-[var(--app-brand-soft)] text-[var(--app-brand)]' : 'text-[var(--app-text-faint)] hover:text-[var(--app-text)] hover:bg-[var(--app-panel-2)]'}`}>
                 {k === 'requests' && requests.length > 0 ? `Req (${requests.length})` : k}
               </button>
             ))}
@@ -543,13 +555,13 @@ function FriendsTab({ userId: _userId, username: _username, token, hdr }: { user
             friends.length === 0
               ? <EmptyState icon="👥" text="No friends yet" sub="Use the Find tab to add people" />
               : friends.map(f => (
-                <div key={f.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[#12121E] transition-colors group">
+                <div key={f.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--app-panel-2)] transition-colors group">
                   <Avatar name={f.username} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-white truncate">{f.username}</p>
+                    <p className="text-sm font-semibold text-[var(--app-text)] truncate">{f.username}</p>
                     <p className="text-xs text-green-400">Friend</p>
                   </div>
-                  <button onClick={() => remove(f.friendId)} className="opacity-0 group-hover:opacity-100 text-[#4B5563] hover:text-red-400 text-xs transition-all">Remove</button>
+                  <button onClick={() => remove(f.friendId)} className="opacity-0 group-hover:opacity-100 text-[var(--app-text-faint)] hover:text-red-400 text-xs transition-all">Remove</button>
                 </div>
               ))
           )}
@@ -557,29 +569,29 @@ function FriendsTab({ userId: _userId, username: _username, token, hdr }: { user
             requests.length === 0
               ? <EmptyState icon="📬" text="No pending requests" />
               : requests.map(req => (
-                <div key={req.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[#12121E] transition-colors">
+                <div key={req.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--app-panel-2)] transition-colors">
                   <Avatar name={req.username} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-white truncate">{req.username}</p>
-                    <p className="text-xs text-[#4B5563]">Wants to be friends</p>
+                    <p className="text-sm font-semibold text-[var(--app-text)] truncate">{req.username}</p>
+                    <p className="text-xs text-[var(--app-text-faint)]">Wants to be friends</p>
                   </div>
                   <div className="flex gap-1.5">
                     <button onClick={() => accept(req.id)} className="px-2.5 py-1 text-xs bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 rounded-lg hover:bg-indigo-500/25 transition-all">✓</button>
-                    <button onClick={() => decline(req.id)} className="px-2.5 py-1 text-xs bg-[#12121E] border border-[#1E1E30] text-[#4B5563] rounded-lg hover:text-red-400 transition-all">✕</button>
+                    <button onClick={() => decline(req.id)} className="px-2.5 py-1 text-xs bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] text-[var(--app-text-faint)] rounded-lg hover:text-red-400 transition-all">✕</button>
                   </div>
                 </div>
               ))
           )}
           {sub === 'find' && (
             <div className="p-4 space-y-3">
-              <input className="w-full bg-[#12121E] border border-[#1E1E30] rounded-xl px-3 py-2 text-sm text-white placeholder:text-[#4B5563] focus:outline-none focus:border-indigo-500/50 transition-colors"
+              <input className="w-full bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] rounded-xl px-3 py-2 text-sm text-[var(--app-text)] placeholder:text-[var(--app-text-faint)] focus:outline-none focus:border-[var(--app-brand)]/50 transition-colors"
                 placeholder="Search by username..." value={search} onChange={e => setSearch(e.target.value)} autoFocus />
               {info && <p className="text-xs text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 rounded-lg px-3 py-2">{info}</p>}
               {results.map(u => (
-                <div key={u.id} className="flex items-center gap-3 bg-[#12121E] rounded-xl p-3">
+                <div key={u.id} className="flex items-center gap-3 bg-[var(--app-panel-2)] rounded-xl p-3">
                   <Avatar name={u.username} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-white">{u.username}</p>
+                    <p className="text-sm font-semibold text-[var(--app-text)]">{u.username}</p>
                   </div>
                   <button onClick={() => sendRequest(u.username)} disabled={loading}
                     className="px-3 py-1.5 text-xs bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 rounded-lg hover:bg-indigo-500/25 transition-all disabled:opacity-40">
@@ -592,9 +604,9 @@ function FriendsTab({ userId: _userId, username: _username, token, hdr }: { user
         </div>
       </div>
       <div className="flex-1 flex flex-col items-center justify-center text-center gap-3">
-        <div className="w-20 h-20 rounded-full bg-[#12121E] border border-[#1E1E30] flex items-center justify-center text-3xl">👥</div>
-        <p className="text-white font-semibold">{friends.length} Friends</p>
-        <p className="text-[#4B5563] text-sm">Your friend list is end-to-end encrypted.</p>
+        <div className="w-20 h-20 rounded-full bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] flex items-center justify-center text-3xl">👥</div>
+        <p className="text-[var(--app-text)] font-semibold">{friends.length} Friends</p>
+        <p className="text-[var(--app-text-faint)] text-sm">Your friend list is end-to-end encrypted.</p>
       </div>
     </>
   )
@@ -666,10 +678,10 @@ function PendingTab({ userId, token, privateKey, publicKey, hdr }: {
 
   return (
     <>
-      <div className="w-72 shrink-0 border-r border-[#1E1E30] flex flex-col bg-[#0E0E1C]">
-        <div className="p-4 border-b border-[#1E1E30]">
-          <h2 className="text-white font-bold text-base">Pending Messages</h2>
-          <p className="text-xs text-[#4B5563] mt-0.5">Requests from people not in your friends</p>
+      <div className="w-72 shrink-0 border-r border-[var(--app-border-soft)] flex flex-col bg-[var(--app-panel)]">
+        <div className="p-4 border-b border-[var(--app-border-soft)]">
+          <h2 className="text-[var(--app-text)] font-bold text-base">Pending Messages</h2>
+          <p className="text-xs text-[var(--app-text-faint)] mt-0.5">Requests from people not in your friends</p>
         </div>
         <div className="flex-1 overflow-y-auto">
           {pending.length === 0
@@ -677,13 +689,13 @@ function PendingTab({ userId, token, privateKey, publicKey, hdr }: {
             : pending.map(m => (
               <button key={m.id} onClick={() => setActive(m)}
                 className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${
-                  active?.id === m.id ? 'bg-indigo-500/10 border-l-2 border-indigo-500' : 'hover:bg-[#12121E] border-l-2 border-transparent'
+                  active?.id === m.id ? 'bg-indigo-500/10 border-l-2 border-indigo-500' : 'hover:bg-[var(--app-panel-2)] border-l-2 border-transparent'
                 }`}>
                 <Avatar name={m.fromUsername} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-white truncate">{m.fromUsername}</p>
-                  <p className="text-xs text-[#4B5563] truncate">{m.text ?? '...'}</p>
-                  <p className="text-[10px] text-[#4B5563]/60">{fmt(m.createdAt)}</p>
+                  <p className="text-sm font-semibold text-[var(--app-text)] truncate">{m.fromUsername}</p>
+                  <p className="text-xs text-[var(--app-text-faint)] truncate">{m.text ?? '...'}</p>
+                  <p className="text-[10px] text-[var(--app-text-faint)]/60">{fmt(m.createdAt)}</p>
                 </div>
               </button>
             ))
@@ -691,20 +703,20 @@ function PendingTab({ userId, token, privateKey, publicKey, hdr }: {
         </div>
 
         {/* Send pending */}
-        <div className="p-3 border-t border-[#1E1E30] space-y-2">
-          <p className="text-xs text-[#4B5563] uppercase tracking-wider">Send to non-friend</p>
+        <div className="p-3 border-t border-[var(--app-border-soft)] space-y-2">
+          <p className="text-xs text-[var(--app-text-faint)] uppercase tracking-wider">Send to non-friend</p>
           <div className="flex gap-1.5">
-            <input className="flex-1 bg-[#12121E] border border-[#1E1E30] rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-[#4B5563] focus:outline-none focus:border-indigo-500/50"
+            <input className="flex-1 bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] rounded-lg px-2.5 py-1.5 text-xs text-[var(--app-text)] placeholder:text-[var(--app-text-faint)] focus:outline-none focus:border-indigo-500/50"
               placeholder="Username..." value={sendTo} onChange={e => setSendTo(e.target.value)} onKeyDown={e => e.key === 'Enter' && searchUser()} />
             <button onClick={searchUser} className="px-2 text-xs bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 rounded-lg hover:bg-indigo-500/30">Find</button>
           </div>
           {sendRes && (
             <div className="space-y-1.5">
-              <div className="flex items-center gap-2 bg-[#12121E] rounded-lg px-2 py-1.5">
+              <div className="flex items-center gap-2 bg-[var(--app-panel-2)] rounded-lg px-2 py-1.5">
                 <Avatar name={sendRes.username} size={22} />
-                <p className="text-xs text-white">{sendRes.username}</p>
+                <p className="text-xs text-[var(--app-text)]">{sendRes.username}</p>
               </div>
-              <textarea className="w-full bg-[#12121E] border border-[#1E1E30] rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-[#4B5563] focus:outline-none focus:border-indigo-500/50 resize-none"
+              <textarea className="w-full bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] rounded-lg px-2.5 py-1.5 text-xs text-[var(--app-text)] placeholder:text-[var(--app-text-faint)] focus:outline-none focus:border-indigo-500/50 resize-none"
                 placeholder="Message..." rows={2} value={sendMsg} onChange={e => setSendMsg(e.target.value)} />
               <button onClick={sendPending} className="w-full py-1.5 text-xs bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 rounded-lg hover:bg-indigo-500/30 transition-all">Send →</button>
             </div>
@@ -719,12 +731,12 @@ function PendingTab({ userId, token, privateKey, publicKey, hdr }: {
             <div className="flex items-center gap-3 mb-6">
               <Avatar name={active.fromUsername} size={48} />
               <div>
-                <p className="font-semibold text-white">{active.fromUsername}</p>
-                <p className="text-xs text-[#4B5563]">{fmt(active.createdAt)}</p>
+                <p className="font-semibold text-[var(--app-text)]">{active.fromUsername}</p>
+                <p className="text-xs text-[var(--app-text-faint)]">{fmt(active.createdAt)}</p>
               </div>
             </div>
-            <div className="bg-[#12121E] border border-[#1E1E30] rounded-2xl p-6 mb-6">
-              <p className="text-white leading-relaxed">{active.text ?? '[encrypted]'}</p>
+            <div className="bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] rounded-2xl p-6 mb-6">
+              <p className="text-[var(--app-text)] leading-relaxed">{active.text ?? '[encrypted]'}</p>
             </div>
             <div className="flex gap-3">
               <button onClick={() => accept(active)}
@@ -732,7 +744,7 @@ function PendingTab({ userId, token, privateKey, publicKey, hdr }: {
                 Accept & Start Chat
               </button>
               <button onClick={() => dismiss(active.id)}
-                className="px-6 py-3 bg-[#12121E] border border-[#1E1E30] text-[#4B5563] rounded-xl hover:text-red-400 hover:border-red-500/30 transition-all">
+                className="px-6 py-3 bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] text-[var(--app-text-faint)] rounded-xl hover:text-red-400 hover:border-red-500/30 transition-all">
                 Dismiss
               </button>
             </div>
@@ -779,24 +791,24 @@ function StoriesTab({ userId, username: _u, hdr }: { userId: string; username: s
 
   return (
     <>
-      <div className="w-72 shrink-0 border-r border-[#1E1E30] flex flex-col bg-[#0E0E1C]">
-        <div className="p-4 border-b border-[#1E1E30] flex items-center justify-between">
-          <h2 className="text-white font-bold text-base">Stories</h2>
+      <div className="w-72 shrink-0 border-r border-[var(--app-border-soft)] flex flex-col bg-[var(--app-panel)]">
+        <div className="p-4 border-b border-[var(--app-border-soft)] flex items-center justify-between">
+          <h2 className="text-[var(--app-text)] font-bold text-base">Stories</h2>
           <button onClick={() => setShowForm(s => !s)}
             className="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 text-lg flex items-center justify-center hover:bg-indigo-500/30 transition-all">
             +
           </button>
         </div>
         {showForm && (
-          <form onSubmit={post} className="p-4 border-b border-[#1E1E30] space-y-2">
-            <textarea className="w-full bg-[#12121E] border border-[#1E1E30] rounded-xl px-3 py-2 text-sm text-white placeholder:text-[#4B5563] focus:outline-none focus:border-indigo-500/50 resize-none transition-colors"
+          <form onSubmit={post} className="p-4 border-b border-[var(--app-border-soft)] space-y-2">
+            <textarea className="w-full bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] rounded-xl px-3 py-2 text-sm text-[var(--app-text)] placeholder:text-[var(--app-text-faint)] focus:outline-none focus:border-indigo-500/50 resize-none transition-colors"
               placeholder="What's on your mind? (24h)" rows={3} value={content} onChange={e => setContent(e.target.value)} maxLength={500} autoFocus />
             <div className="flex gap-2">
               <button type="submit" disabled={posting || !content.trim()}
                 className="flex-1 py-1.5 text-xs bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 rounded-lg hover:bg-indigo-500/30 disabled:opacity-40 transition-all">
                 {posting ? 'Posting...' : 'Post Story'}
               </button>
-              <button type="button" onClick={() => setShowForm(false)} className="px-3 text-xs text-[#4B5563] hover:text-white transition-colors">Cancel</button>
+              <button type="button" onClick={() => setShowForm(false)} className="px-3 text-xs text-[var(--app-text-faint)] hover:text-[var(--app-text)] transition-colors">Cancel</button>
             </div>
           </form>
         )}
@@ -806,16 +818,16 @@ function StoriesTab({ userId, username: _u, hdr }: { userId: string; username: s
             : stories.map(s => (
               <button key={s.id} onClick={() => setActive(s)}
                 className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${
-                  active?.id === s.id ? 'bg-indigo-500/10 border-l-2 border-indigo-500' : 'hover:bg-[#12121E] border-l-2 border-transparent'
+                  active?.id === s.id ? 'bg-indigo-500/10 border-l-2 border-indigo-500' : 'hover:bg-[var(--app-panel-2)] border-l-2 border-transparent'
                 }`}>
                 <div className="relative shrink-0">
                   <Avatar name={s.userId.slice(0, 6)} size={40} />
-                  {isMine(s) && <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-indigo-400 border-2 border-[#0E0E1C]" />}
+                  {isMine(s) && <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-indigo-400 border-2 border-[var(--app-panel)]" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-white truncate">{isMine(s) ? 'You' : s.userId.slice(0,8)+'...'}</p>
-                  <p className="text-xs text-[#4B5563] truncate">{s.content}</p>
-                  <p className="text-[10px] text-[#4B5563]/60">{timeLeft(s.expiresAt)}</p>
+                  <p className="text-sm font-semibold text-[var(--app-text)] truncate">{isMine(s) ? 'You' : s.userId.slice(0,8)+'...'}</p>
+                  <p className="text-xs text-[var(--app-text-faint)] truncate">{s.content}</p>
+                  <p className="text-[10px] text-[var(--app-text-faint)]/60">{timeLeft(s.expiresAt)}</p>
                 </div>
               </button>
             ))
@@ -826,15 +838,15 @@ function StoriesTab({ userId, username: _u, hdr }: { userId: string; username: s
       <div className="flex-1 flex flex-col items-center justify-center p-8">
         {active ? (
           <div className="max-w-lg w-full">
-            <div className="bg-[#12121E] border border-[#1E1E30] rounded-2xl p-8 space-y-4">
+            <div className="bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] rounded-2xl p-8 space-y-4">
               <div className="flex items-center gap-3">
                 <Avatar name={active.userId.slice(0,6)} size={48} />
                 <div>
-                  <p className="font-semibold text-white text-sm">{isMine(active) ? 'You' : active.userId.slice(0,8)+'...'}</p>
-                  <p className="text-xs text-[#4B5563]">{timeLeft(active.expiresAt)}</p>
+                  <p className="font-semibold text-[var(--app-text)] text-sm">{isMine(active) ? 'You' : active.userId.slice(0,8)+'...'}</p>
+                  <p className="text-xs text-[var(--app-text-faint)]">{timeLeft(active.expiresAt)}</p>
                 </div>
               </div>
-              <p className="text-white text-base leading-relaxed">{active.content}</p>
+              <p className="text-[var(--app-text)] text-base leading-relaxed">{active.content}</p>
             </div>
           </div>
         ) : (
@@ -881,11 +893,11 @@ function NotesTab() {
 
   return (
     <>
-      <div className="w-72 shrink-0 border-r border-[#1E1E30] flex flex-col bg-[#0E0E1C]">
-        <div className="p-4 border-b border-[#1E1E30] flex items-center justify-between">
+      <div className="w-72 shrink-0 border-r border-[var(--app-border-soft)] flex flex-col bg-[var(--app-panel)]">
+        <div className="p-4 border-b border-[var(--app-border-soft)] flex items-center justify-between">
           <div>
-            <h2 className="text-white font-bold text-base">Notes</h2>
-            <p className="text-[#4B5563]/60 text-xs">Private · Local only</p>
+            <h2 className="text-[var(--app-text)] font-bold text-base">Notes</h2>
+            <p className="text-[var(--app-text-faint)]/60 text-xs">Private · Local only</p>
           </div>
           <button onClick={newNote}
             className="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 text-lg flex items-center justify-center hover:bg-indigo-500/30 transition-all">
@@ -898,15 +910,15 @@ function NotesTab() {
             : notes.map(n => (
               <button key={n.id} onClick={() => { setActive(n); setText(n.text); setChanged(false) }}
                 className={`w-full text-left px-4 py-3 transition-colors group ${
-                  active?.id === n.id ? 'bg-indigo-500/10 border-l-2 border-indigo-500' : 'hover:bg-[#12121E] border-l-2 border-transparent'
+                  active?.id === n.id ? 'bg-indigo-500/10 border-l-2 border-indigo-500' : 'hover:bg-[var(--app-panel-2)] border-l-2 border-transparent'
                 }`}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-white truncate font-medium">{n.text.split('\n')[0] || 'Empty note'}</p>
-                    <p className="text-xs text-[#4B5563] mt-0.5">{new Date(n.updatedAt).toLocaleDateString()}</p>
+                    <p className="text-sm text-[var(--app-text)] truncate font-medium">{n.text.split('\n')[0] || 'Empty note'}</p>
+                    <p className="text-xs text-[var(--app-text-faint)] mt-0.5">{new Date(n.updatedAt).toLocaleDateString()}</p>
                   </div>
                   <button onClick={e => { e.stopPropagation(); deleteNote(n.id) }}
-                    className="opacity-0 group-hover:opacity-100 text-[#4B5563] hover:text-red-400 transition-all text-sm">✕</button>
+                    className="opacity-0 group-hover:opacity-100 text-[var(--app-text-faint)] hover:text-red-400 transition-all text-sm">✕</button>
                 </div>
               </button>
             ))
@@ -917,8 +929,8 @@ function NotesTab() {
       <div className="flex-1 flex flex-col min-w-0">
         {active ? (
           <>
-            <div className="flex items-center justify-between px-6 py-3 border-b border-[#1E1E30] bg-[#0E0E1C] shrink-0">
-              <p className="text-sm text-[#4B5563]">
+            <div className="flex items-center justify-between px-6 py-3 border-b border-[var(--app-border-soft)] bg-[var(--app-panel)] shrink-0">
+              <p className="text-sm text-[var(--app-text-faint)]">
                 {changed ? <span className="text-yellow-400">Unsaved changes</span> : `Saved ${new Date(active.updatedAt).toLocaleTimeString()}`}
               </p>
               <button onClick={saveNote} disabled={!changed}
@@ -927,12 +939,12 @@ function NotesTab() {
               </button>
             </div>
             <textarea
-              className="flex-1 bg-[#08080F] text-white text-sm leading-relaxed p-8 resize-none focus:outline-none placeholder:text-[#4B5563]/50"
+              className="flex-1 bg-[var(--app-bg)] text-[var(--app-text)] text-sm leading-relaxed p-8 resize-none focus:outline-none placeholder:text-[var(--app-text-faint)]/50"
               placeholder="Start writing..." value={text}
               onChange={e => { setText(e.target.value); setChanged(true) }}
               onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); saveNote() } }}
             />
-            <div className="px-6 py-2 border-t border-[#1E1E30] bg-[#0E0E1C] text-xs text-[#4B5563]/50 flex justify-between shrink-0">
+            <div className="px-6 py-2 border-t border-[var(--app-border-soft)] bg-[var(--app-panel)] text-xs text-[var(--app-text-faint)]/50 flex justify-between shrink-0">
               <span>🔒 Private — never leaves this device</span>
               <span>Ctrl+S to save</span>
             </div>
@@ -1037,21 +1049,21 @@ function SettingsTab({ userId, token, hdr }: { userId: string; token: string; hd
 
   return (
     <>
-      <div className="w-56 shrink-0 border-r border-[#1E1E30] flex flex-col bg-[#0E0E1C]">
-        <div className="p-4 border-b border-[#1E1E30]">
-          <h2 className="text-white font-bold text-base">Settings</h2>
+      <div className="w-56 shrink-0 border-r border-[var(--app-border-soft)] flex flex-col bg-[var(--app-panel)]">
+        <div className="p-4 border-b border-[var(--app-border-soft)]">
+          <h2 className="text-[var(--app-text)] font-bold text-base">Settings</h2>
         </div>
         <div className="flex-1 overflow-y-auto p-2">
           {TABS.map(({ key, label }) => (
             <button key={key} onClick={() => setSub(key)}
               className={`w-full text-left px-3 py-2.5 rounded-xl text-sm transition-all mb-0.5 ${
-                sub === key ? 'bg-indigo-500/20 text-indigo-400' : 'text-[#4B5563] hover:text-white hover:bg-[#1E1E30]'
+                sub === key ? 'bg-indigo-500/20 text-indigo-400' : 'text-[var(--app-text-faint)] hover:text-[var(--app-text)] hover:bg-[var(--app-panel-2)]'
               }`}>
               {label}
             </button>
           ))}
         </div>
-        <div className="p-3 border-t border-[#1E1E30]">
+        <div className="p-3 border-t border-[var(--app-border-soft)]">
           <button onClick={logout} className="w-full py-2 text-xs text-red-400 hover:bg-red-950/30 rounded-xl transition-all">Sign out</button>
         </div>
       </div>
@@ -1062,19 +1074,19 @@ function SettingsTab({ userId, token, hdr }: { userId: string; token: string; hd
 
           {sub === 'profile' && (
             <form onSubmit={saveProfile} className="space-y-4">
-              <h3 className="text-white font-bold text-lg mb-4">Profile</h3>
+              <h3 className="text-[var(--app-text)] font-bold text-lg mb-4">Profile</h3>
               <div>
-                <label className="block text-xs text-[#4B5563] mb-1.5 uppercase tracking-wider">Username</label>
-                <div className="bg-[#12121E] border border-[#1E1E30] rounded-xl px-4 py-2.5 text-sm text-[#4B5563]">@{profile?.username}</div>
+                <label className="block text-xs text-[var(--app-text-faint)] mb-1.5 uppercase tracking-wider">Username</label>
+                <div className="bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] rounded-xl px-4 py-2.5 text-sm text-[var(--app-text-faint)]">@{profile?.username}</div>
               </div>
               <div>
-                <label className="block text-xs text-[#4B5563] mb-1.5 uppercase tracking-wider">Display Name</label>
-                <input className="w-full bg-[#12121E] border border-[#1E1E30] rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-[#4B5563] focus:outline-none focus:border-indigo-500/50 transition-colors"
+                <label className="block text-xs text-[var(--app-text-faint)] mb-1.5 uppercase tracking-wider">Display Name</label>
+                <input className="w-full bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] rounded-xl px-4 py-2.5 text-sm text-[var(--app-text)] placeholder:text-[var(--app-text-faint)] focus:outline-none focus:border-indigo-500/50 transition-colors"
                   placeholder="Your name" value={displayName} onChange={e => setDisplayName(e.target.value)} />
               </div>
               <div>
-                <label className="block text-xs text-[#4B5563] mb-1.5 uppercase tracking-wider">Bio</label>
-                <textarea className="w-full bg-[#12121E] border border-[#1E1E30] rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-[#4B5563] focus:outline-none focus:border-indigo-500/50 resize-none transition-colors"
+                <label className="block text-xs text-[var(--app-text-faint)] mb-1.5 uppercase tracking-wider">Bio</label>
+                <textarea className="w-full bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] rounded-xl px-4 py-2.5 text-sm text-[var(--app-text)] placeholder:text-[var(--app-text-faint)] focus:outline-none focus:border-indigo-500/50 resize-none transition-colors"
                   placeholder="About you..." rows={3} value={bio} onChange={e => setBio(e.target.value)} />
               </div>
               <button type="submit" disabled={saving}
@@ -1082,7 +1094,7 @@ function SettingsTab({ userId, token, hdr }: { userId: string; token: string; hd
                 {saving ? 'Saving...' : 'Save Profile'}
               </button>
               <button type="button" onClick={genInvite}
-                className="w-full py-2.5 bg-[#12121E] border border-[#1E1E30] text-[#4B5563] rounded-xl hover:text-white transition-all text-sm">
+                className="w-full py-2.5 bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] text-[var(--app-text-faint)] rounded-xl hover:text-[var(--app-text)] transition-all text-sm">
                 Generate Invite Link
               </button>
             </form>
@@ -1090,31 +1102,31 @@ function SettingsTab({ userId, token, hdr }: { userId: string; token: string; hd
 
           {sub === 'security' && (
             <div className="space-y-6">
-              <h3 className="text-white font-bold text-lg">Two-Factor Auth (TOTP)</h3>
+              <h3 className="text-[var(--app-text)] font-bold text-lg">Two-Factor Auth (TOTP)</h3>
               {profile?.totpEnabled ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-xl px-4 py-3">
                     <span className="text-green-400">✓</span>
                     <p className="text-green-400 text-sm">TOTP is enabled</p>
                   </div>
-                  <input className="w-full bg-[#12121E] border border-[#1E1E30] rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-[#4B5563] focus:outline-none focus:border-indigo-500/50"
+                  <input className="w-full bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] rounded-xl px-4 py-2.5 text-sm text-[var(--app-text)] placeholder:text-[var(--app-text-faint)] focus:outline-none focus:border-indigo-500/50"
                     placeholder="Enter code to disable..." value={totpCode} onChange={e => setTotpCode(e.target.value)} maxLength={6} />
                   <button onClick={disableTotp} className="w-full py-2.5 bg-red-950/30 border border-red-500/30 text-red-400 rounded-xl hover:bg-red-950/50 transition-all text-sm">Disable TOTP</button>
                 </div>
               ) : totpSecret ? (
                 <div className="space-y-3">
-                  <div className="bg-[#12121E] border border-[#1E1E30] rounded-xl p-4 space-y-2">
-                    <p className="text-xs text-[#4B5563]">Scan this URL in your authenticator app:</p>
+                  <div className="bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] rounded-xl p-4 space-y-2">
+                    <p className="text-xs text-[var(--app-text-faint)]">Scan this URL in your authenticator app:</p>
                     <p className="text-xs text-indigo-400 break-all">{totpUrl}</p>
-                    <p className="text-xs text-[#4B5563] mt-2">Secret: <span className="text-white font-mono">{totpSecret}</span></p>
+                    <p className="text-xs text-[var(--app-text-faint)] mt-2">Secret: <span className="text-[var(--app-text)] font-mono">{totpSecret}</span></p>
                   </div>
-                  <input className="w-full bg-[#12121E] border border-[#1E1E30] rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-[#4B5563] focus:outline-none focus:border-indigo-500/50"
+                  <input className="w-full bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] rounded-xl px-4 py-2.5 text-sm text-[var(--app-text)] placeholder:text-[var(--app-text-faint)] focus:outline-none focus:border-indigo-500/50"
                     placeholder="Enter 6-digit code to verify..." value={totpCode} onChange={e => setTotpCode(e.target.value)} maxLength={6} />
                   <button onClick={verifyTotp} className="w-full py-2.5 bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 rounded-xl hover:bg-indigo-500/30 transition-all">Verify & Enable</button>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <p className="text-sm text-[#4B5563]">Add an extra layer of security with a TOTP authenticator app.</p>
+                  <p className="text-sm text-[var(--app-text-faint)]">Add an extra layer of security with a TOTP authenticator app.</p>
                   <button onClick={startTotp} className="w-full py-2.5 bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 rounded-xl hover:bg-indigo-500/30 transition-all">Setup TOTP</button>
                 </div>
               )}
@@ -1123,17 +1135,17 @@ function SettingsTab({ userId, token, hdr }: { userId: string; token: string; hd
 
           {sub === 'blocks' && (
             <div className="space-y-4">
-              <h3 className="text-white font-bold text-lg">Blocked Users</h3>
+              <h3 className="text-[var(--app-text)] font-bold text-lg">Blocked Users</h3>
               {blocks.length === 0
                 ? <EmptyState icon="🚫" text="No blocked users" />
                 : blocks.map(u => (
-                  <div key={u.id} className="flex items-center gap-3 bg-[#12121E] border border-[#1E1E30] rounded-xl p-4">
+                  <div key={u.id} className="flex items-center gap-3 bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] rounded-xl p-4">
                     <Avatar name={u.username} />
                     <div className="flex-1">
-                      <p className="text-sm font-semibold text-white">{u.username}</p>
-                      <p className="text-xs text-[#4B5563]">Blocked {new Date(u.createdAt * 1000).toLocaleDateString()}</p>
+                      <p className="text-sm font-semibold text-[var(--app-text)]">{u.username}</p>
+                      <p className="text-xs text-[var(--app-text-faint)]">Blocked {new Date(u.createdAt * 1000).toLocaleDateString()}</p>
                     </div>
-                    <button onClick={() => unblock(u.id)} className="px-3 py-1.5 text-xs bg-[#1E1E30] border border-[#2E2E45] text-[#4B5563] rounded-lg hover:text-white transition-all">Unblock</button>
+                    <button onClick={() => unblock(u.id)} className="px-3 py-1.5 text-xs bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] text-[var(--app-text-faint)] rounded-lg hover:text-[var(--app-text)] transition-all">Unblock</button>
                   </div>
                 ))
               }
@@ -1142,25 +1154,25 @@ function SettingsTab({ userId, token, hdr }: { userId: string; token: string; hd
 
           {sub === 'passphrase' && (
             <div className="space-y-4">
-              <h3 className="text-white font-bold text-lg">Passphrase Backup</h3>
+              <h3 className="text-[var(--app-text)] font-bold text-lg">Passphrase Backup</h3>
               <div className="bg-yellow-950/20 border border-yellow-500/20 rounded-xl p-4">
                 <p className="text-yellow-400 text-xs leading-relaxed">
                   ⚠ Your passphrase encrypts your private key backup on the server. If you change it, the old passphrase will no longer work to restore your key on new devices.
                 </p>
               </div>
               <div>
-                <label className="block text-xs text-[#4B5563] mb-1.5 uppercase tracking-wider">Old Passphrase (to verify)</label>
-                <input type="password" className="w-full bg-[#12121E] border border-[#1E1E30] rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-[#4B5563] focus:outline-none focus:border-indigo-500/50"
+                <label className="block text-xs text-[var(--app-text-faint)] mb-1.5 uppercase tracking-wider">Old Passphrase (to verify)</label>
+                <input type="password" className="w-full bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] rounded-xl px-4 py-2.5 text-sm text-[var(--app-text)] placeholder:text-[var(--app-text-faint)] focus:outline-none focus:border-indigo-500/50"
                   placeholder="Old passphrase..." value={oldPass} onChange={e => setOldPass(e.target.value)} />
               </div>
               <div>
-                <label className="block text-xs text-[#4B5563] mb-1.5 uppercase tracking-wider">New Passphrase</label>
-                <input type="password" className="w-full bg-[#12121E] border border-[#1E1E30] rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-[#4B5563] focus:outline-none focus:border-indigo-500/50"
+                <label className="block text-xs text-[var(--app-text-faint)] mb-1.5 uppercase tracking-wider">New Passphrase</label>
+                <input type="password" className="w-full bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] rounded-xl px-4 py-2.5 text-sm text-[var(--app-text)] placeholder:text-[var(--app-text-faint)] focus:outline-none focus:border-indigo-500/50"
                   placeholder="New passphrase..." value={newPass} onChange={e => setNewPass(e.target.value)} />
               </div>
               <div>
-                <label className="block text-xs text-[#4B5563] mb-1.5 uppercase tracking-wider">Confirm New Passphrase</label>
-                <input type="password" className="w-full bg-[#12121E] border border-[#1E1E30] rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-[#4B5563] focus:outline-none focus:border-indigo-500/50"
+                <label className="block text-xs text-[var(--app-text-faint)] mb-1.5 uppercase tracking-wider">Confirm New Passphrase</label>
+                <input type="password" className="w-full bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] rounded-xl px-4 py-2.5 text-sm text-[var(--app-text)] placeholder:text-[var(--app-text-faint)] focus:outline-none focus:border-indigo-500/50"
                   placeholder="Confirm..." value={confPass} onChange={e => setConfPass(e.target.value)} />
               </div>
               <button onClick={changePassphrase} disabled={saving}
@@ -1203,13 +1215,13 @@ function AdminTab({ hdr }: { hdr: Record<string, string> }) {
 
   return (
     <>
-      <div className="w-72 shrink-0 border-r border-[#1E1E30] flex flex-col bg-[#0E0E1C]">
-        <div className="p-4 border-b border-[#1E1E30]">
-          <h2 className="text-white font-bold text-base">Admin Panel</h2>
+      <div className="w-72 shrink-0 border-r border-[var(--app-border-soft)] flex flex-col bg-[var(--app-panel)]">
+        <div className="p-4 border-b border-[var(--app-border-soft)]">
+          <h2 className="text-[var(--app-text)] font-bold text-base">Admin Panel</h2>
           <div className="flex gap-1.5 mt-3">
             {(['pending','all'] as const).map(k => (
               <button key={k} onClick={() => setFilter(k)}
-                className={`flex-1 py-1.5 text-xs rounded-lg transition-all capitalize ${filter === k ? 'bg-indigo-500/20 text-indigo-400' : 'text-[#4B5563] hover:text-white hover:bg-[#1E1E30]'}`}>
+                className={`flex-1 py-1.5 text-xs rounded-lg transition-all capitalize ${filter === k ? 'bg-indigo-500/20 text-indigo-400' : 'text-[var(--app-text-faint)] hover:text-[var(--app-text)] hover:bg-[var(--app-panel-2)]'}`}>
                 {k === 'pending' ? `Pending (${reports.filter(r=>r.status==='pending').length})` : 'All Reports'}
               </button>
             ))}
@@ -1221,15 +1233,15 @@ function AdminTab({ hdr }: { hdr: Record<string, string> }) {
             : filtered.map(r => (
               <button key={r.id} onClick={() => { setActive(r); setNote(r.adminNote ?? '') }}
                 className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${
-                  active?.id === r.id ? 'bg-indigo-500/10 border-l-2 border-indigo-500' : 'hover:bg-[#12121E] border-l-2 border-transparent'
+                  active?.id === r.id ? 'bg-indigo-500/10 border-l-2 border-indigo-500' : 'hover:bg-[var(--app-panel-2)] border-l-2 border-transparent'
                 }`}>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-white truncate">@{r.reportedUsername}</p>
+                    <p className="text-sm font-semibold text-[var(--app-text)] truncate">@{r.reportedUsername}</p>
                     <span className={`text-[10px] ${statusColor(r.status)}`}>{r.status}</span>
                   </div>
-                  <p className="text-xs text-[#4B5563] truncate">{r.reason}</p>
-                  <p className="text-[10px] text-[#4B5563]/60">by @{r.reporterUsername}</p>
+                  <p className="text-xs text-[var(--app-text-faint)] truncate">{r.reason}</p>
+                  <p className="text-[10px] text-[var(--app-text-faint)]/60">by @{r.reporterUsername}</p>
                 </div>
               </button>
             ))
@@ -1241,21 +1253,21 @@ function AdminTab({ hdr }: { hdr: Record<string, string> }) {
         {active ? (
           <div className="max-w-lg space-y-4">
             <div>
-              <h3 className="text-white font-bold text-lg mb-1">Report #{active.id.slice(0,8)}</h3>
+              <h3 className="text-[var(--app-text)] font-bold text-lg mb-1">Report #{active.id.slice(0,8)}</h3>
               <span className={`text-xs px-2 py-0.5 rounded-full border ${statusColor(active.status)} bg-current/10 border-current/30`}>{active.status}</span>
             </div>
-            <div className="bg-[#12121E] border border-[#1E1E30] rounded-xl p-4 space-y-2">
+            <div className="bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] rounded-xl p-4 space-y-2">
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div><p className="text-xs text-[#4B5563]">Reporter</p><p className="text-white">@{active.reporterUsername}</p></div>
-                <div><p className="text-xs text-[#4B5563]">Reported</p><p className="text-white">@{active.reportedUsername}</p></div>
-                <div><p className="text-xs text-[#4B5563]">Reason</p><p className="text-white">{active.reason}</p></div>
-                <div><p className="text-xs text-[#4B5563]">Date</p><p className="text-white">{new Date(active.createdAt * 1000).toLocaleDateString()}</p></div>
+                <div><p className="text-xs text-[var(--app-text-faint)]">Reporter</p><p className="text-[var(--app-text)]">@{active.reporterUsername}</p></div>
+                <div><p className="text-xs text-[var(--app-text-faint)]">Reported</p><p className="text-[var(--app-text)]">@{active.reportedUsername}</p></div>
+                <div><p className="text-xs text-[var(--app-text-faint)]">Reason</p><p className="text-[var(--app-text)]">{active.reason}</p></div>
+                <div><p className="text-xs text-[var(--app-text-faint)]">Date</p><p className="text-[var(--app-text)]">{new Date(active.createdAt * 1000).toLocaleDateString()}</p></div>
               </div>
-              {active.detail && <div><p className="text-xs text-[#4B5563]">Detail</p><p className="text-white text-sm mt-1">{active.detail}</p></div>}
+              {active.detail && <div><p className="text-xs text-[var(--app-text-faint)]">Detail</p><p className="text-[var(--app-text)] text-sm mt-1">{active.detail}</p></div>}
             </div>
             <div>
-              <label className="block text-xs text-[#4B5563] mb-1.5 uppercase tracking-wider">Admin Note</label>
-              <textarea className="w-full bg-[#12121E] border border-[#1E1E30] rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-[#4B5563] focus:outline-none focus:border-indigo-500/50 resize-none"
+              <label className="block text-xs text-[var(--app-text-faint)] mb-1.5 uppercase tracking-wider">Admin Note</label>
+              <textarea className="w-full bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] rounded-xl px-4 py-2.5 text-sm text-[var(--app-text)] placeholder:text-[var(--app-text-faint)] focus:outline-none focus:border-indigo-500/50 resize-none"
                 placeholder="Note for admin log..." rows={2} value={note} onChange={e => setNote(e.target.value)} />
             </div>
             {active.status === 'pending' && (
@@ -1265,7 +1277,7 @@ function AdminTab({ hdr }: { hdr: Record<string, string> }) {
                   Ban User
                 </button>
                 <button onClick={() => action(active.id, 'dismissed')}
-                  className="flex-1 py-2.5 bg-[#12121E] border border-[#1E1E30] text-[#4B5563] rounded-xl hover:text-white transition-all text-sm">
+                  className="flex-1 py-2.5 bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] text-[var(--app-text-faint)] rounded-xl hover:text-[var(--app-text)] transition-all text-sm">
                   Dismiss
                 </button>
                 <button onClick={() => action(active.id, 'warned')}
@@ -1408,7 +1420,7 @@ function CallsTab({ userId, username, token, hdr }: { userId: string; username: 
       {incomingCall && (
         <div className="flex items-center gap-4 px-6 py-4 bg-green-950/40 border-b border-green-500/20">
           <div className="flex-1">
-            <p className="text-white font-semibold">Incoming call from <span className="text-green-400">@{incomingCall.from}</span></p>
+            <p className="text-[var(--app-text)] font-semibold">Incoming call from <span className="text-green-400">@{incomingCall.from}</span></p>
           </div>
           <button onClick={acceptCall} className="px-4 py-2 bg-green-500/20 border border-green-500/30 text-green-400 rounded-xl hover:bg-green-500/30 transition-all text-sm">Accept</button>
           <button onClick={() => { sendSignal(incomingCall.fromId, { type: 'call-end' }); setIncomingCall(null) }}
@@ -1418,19 +1430,19 @@ function CallsTab({ userId, username, token, hdr }: { userId: string; username: 
 
       <div className="flex flex-1 min-h-0">
         {/* Friends list */}
-        <div className="w-72 shrink-0 border-r border-[#1E1E30] flex flex-col bg-[#0E0E1C]">
-          <div className="p-4 border-b border-[#1E1E30]">
-            <h2 className="text-white font-bold text-base">Calls</h2>
-            <p className="text-xs text-[#4B5563] mt-0.5">Call your friends</p>
+        <div className="w-72 shrink-0 border-r border-[var(--app-border-soft)] flex flex-col bg-[var(--app-panel)]">
+          <div className="p-4 border-b border-[var(--app-border-soft)]">
+            <h2 className="text-[var(--app-text)] font-bold text-base">Calls</h2>
+            <p className="text-xs text-[var(--app-text-faint)] mt-0.5">Call your friends</p>
           </div>
           <div className="flex-1 overflow-y-auto">
             {friends.length === 0
               ? <EmptyState icon="📞" text="No friends yet" sub="Add friends to call them" />
               : friends.map(f => (
-                <div key={f.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[#12121E] transition-colors">
+                <div key={f.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--app-panel-2)] transition-colors">
                   <Avatar name={f.username} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-white truncate">{f.username}</p>
+                    <p className="text-sm font-semibold text-[var(--app-text)] truncate">{f.username}</p>
                     <p className="text-xs text-green-400">Online</p>
                   </div>
                   <div className="flex gap-1.5">
@@ -1450,7 +1462,7 @@ function CallsTab({ userId, username, token, hdr }: { userId: string; username: 
         </div>
 
         {/* Call area */}
-        <div className="flex-1 flex flex-col items-center justify-center bg-[#08080F] relative">
+        <div className="flex-1 flex flex-col items-center justify-center bg-[var(--app-bg)] relative">
           {callState === 'idle' && !incomingCall && (
             <EmptyState icon="📞" text="No active call" sub="Click the phone icon next to a friend to call them" />
           )}
@@ -1461,8 +1473,8 @@ function CallsTab({ userId, username, token, hdr }: { userId: string; username: 
                 <Avatar name={callWith?.username ?? '?'} size={80} />
               </div>
               <div className="text-center">
-                <p className="text-white font-bold text-xl">{callWith?.username}</p>
-                <p className="text-[#4B5563] text-sm mt-1">{callState === 'calling' ? 'Calling...' : 'Incoming...'}</p>
+                <p className="text-[var(--app-text)] font-bold text-xl">{callWith?.username}</p>
+                <p className="text-[var(--app-text-faint)] text-sm mt-1">{callState === 'calling' ? 'Calling...' : 'Incoming...'}</p>
               </div>
               <button onClick={hangup} className="w-14 h-14 rounded-full bg-red-500/20 border border-red-500/30 text-red-400 flex items-center justify-center hover:bg-red-500/30 transition-all">
                 <IconPhoneOff size={22} />
@@ -1473,18 +1485,18 @@ function CallsTab({ userId, username, token, hdr }: { userId: string; username: 
           {callState === 'connected' && (
             <>
               {/* Video area */}
-              <div className="w-full flex-1 relative bg-[#050508] flex items-center justify-center">
+              <div className="w-full flex-1 relative bg-[var(--app-bg)] flex items-center justify-center">
                 {isVideo ? (
                   <>
                     <video ref={remoteRef} autoPlay playsInline className="w-full h-full object-cover" />
-                    <video ref={localRef} autoPlay playsInline muted className="absolute bottom-4 right-4 w-36 h-24 rounded-xl object-cover border border-[#1E1E30]" />
+                    <video ref={localRef} autoPlay playsInline muted className="absolute bottom-4 right-4 w-36 h-24 rounded-xl object-cover border border-[var(--app-border-soft)]" />
                   </>
                 ) : (
                   <div className="flex flex-col items-center gap-4">
                     <div className="w-24 h-24 rounded-full border-2 border-green-500/40 flex items-center justify-center">
                       <Avatar name={callWith?.username ?? '?'} size={80} />
                     </div>
-                    <p className="text-white font-semibold text-xl">{callWith?.username}</p>
+                    <p className="text-[var(--app-text)] font-semibold text-xl">{callWith?.username}</p>
                     <div className="flex items-center gap-2 text-green-400 text-sm">
                       <span className="w-2 h-2 rounded-full bg-green-400 inline-block animate-pulse" />
                       Connected
@@ -1494,14 +1506,14 @@ function CallsTab({ userId, username, token, hdr }: { userId: string; username: 
               </div>
 
               {/* Controls */}
-              <div className="flex items-center gap-4 px-8 py-5 border-t border-[#1E1E30] bg-[#0E0E1C]">
+              <div className="flex items-center gap-4 px-8 py-5 border-t border-[var(--app-border-soft)] bg-[var(--app-panel)]">
                 <button onClick={toggleMute}
-                  className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all ${muted ? 'bg-red-500/20 border-red-500/30 text-red-400' : 'bg-[#1E1E30] border-[#2E2E45] text-[#4B5563] hover:text-white'}`}>
+                  className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all ${muted ? 'bg-red-500/20 border-red-500/30 text-red-400' : 'bg-[var(--app-panel-2)] border-[var(--app-border-soft)] text-[var(--app-text-faint)] hover:text-[var(--app-text)]'}`}>
                   {muted ? <IconMicOff size={18} /> : <IconMic size={18} />}
                 </button>
                 {isVideo && (
                   <button onClick={toggleCam}
-                    className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all ${camOff ? 'bg-red-500/20 border-red-500/30 text-red-400' : 'bg-[#1E1E30] border-[#2E2E45] text-[#4B5563] hover:text-white'}`}>
+                    className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all ${camOff ? 'bg-red-500/20 border-red-500/30 text-red-400' : 'bg-[var(--app-panel-2)] border-[var(--app-border-soft)] text-[var(--app-text-faint)] hover:text-[var(--app-text)]'}`}>
                     {camOff ? <IconVideoOff size={18} /> : <IconVideo size={18} />}
                   </button>
                 )}

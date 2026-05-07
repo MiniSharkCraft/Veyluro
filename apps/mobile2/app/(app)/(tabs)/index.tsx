@@ -8,6 +8,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   useColorScheme,
   View,
@@ -24,6 +25,7 @@ import {
 import { useRooms } from '../../../src/hooks/useRooms'
 import { storage } from '../../../src/lib/storage'
 import { storiesApi, type RoomType, type StoryType } from '../../../src/lib/api'
+import { getTheme, type AppTheme } from '../../../src/lib/theme'
 
 function formatLastTime(ts: number): string {
   const d = new Date(ts * 1000)
@@ -38,36 +40,6 @@ function formatLastTime(ts: number): string {
 
 const avatarColors = ['#0A84FF', '#00A884', '#FF7A1A', '#E9437A', '#7C3AED', '#0891B2']
 const avatarBg = (name: string) => avatarColors[(name?.charCodeAt(0) ?? 0) % avatarColors.length]
-
-const darkTheme = {
-  bg: '#000000',
-  surface: '#1F1F1F',
-  surface2: '#2C2C2E',
-  text: '#F8FAFC',
-  muted: '#B3B3B8',
-  faint: '#77777E',
-  border: '#202024',
-  accent: '#0A84FF',
-  accentSoft: '#102C4D',
-  green: '#22C55E',
-  shadow: 'rgba(0,0,0,0.28)',
-}
-
-const lightTheme = {
-  bg: '#FFFFFF',
-  surface: '#F1F2F4',
-  surface2: '#E7E9EE',
-  text: '#09090B',
-  muted: '#60646C',
-  faint: '#8A8F98',
-  border: '#E5E7EB',
-  accent: '#0A84FF',
-  accentSoft: '#E8F2FF',
-  green: '#16A34A',
-  shadow: 'rgba(15,23,42,0.10)',
-}
-
-type AppTheme = typeof darkTheme
 
 function getRoomDisplayName(room: RoomType, myUsername: string) {
   if (room.type === 'group') return room.name
@@ -146,11 +118,20 @@ function NotesRail({
 
 export default function ChatsScreen() {
   const scheme = useColorScheme()
-  const theme = scheme === 'light' ? lightTheme : darkTheme
+  const theme = getTheme(scheme)
   const { rooms, loading, refetch } = useRooms()
   const [myUsername, setMyUsername] = useState('')
   const [notes, setNotes] = useState<StoryType[]>([])
+  const [search, setSearch] = useState('')
   const styles = useMemo(() => createStyles(theme), [theme])
+  const filteredRooms = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return rooms
+    return rooms.filter(room => {
+      const display = myUsername ? getRoomDisplayName(room, myUsername) : room.name
+      return display.toLowerCase().includes(q) || room.name.toLowerCase().includes(q)
+    })
+  }, [rooms, search, myUsername])
 
   const fetchNotes = async () => {
     try {
@@ -194,10 +175,17 @@ export default function ChatsScreen() {
         </View>
       </View>
 
-      <TouchableOpacity activeOpacity={0.8} style={styles.searchPill}>
+      <View style={styles.searchPill}>
         <MagnifyingGlassIcon size={25} color={theme.faint} weight="bold" />
-        <Text style={styles.searchText}>Hỏi AMoon AI hoặc tìm kiếm</Text>
-      </TouchableOpacity>
+        <TextInput
+          style={styles.searchText}
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Hỏi AMoon AI hoặc tìm kiếm"
+          placeholderTextColor={theme.muted}
+          returnKeyType="search"
+        />
+      </View>
 
       <NotesRail notes={notes} theme={theme} />
 
@@ -212,7 +200,7 @@ export default function ChatsScreen() {
       </View>
 
       <FlatList
-        data={rooms}
+        data={filteredRooms}
         keyExtractor={i => i.id}
         refreshControl={
           <RefreshControl
@@ -229,8 +217,12 @@ export default function ChatsScreen() {
           !loading ? (
             <View style={styles.empty}>
               <ChatsCircleIcon size={54} color={theme.faint} weight="duotone" />
-              <Text style={styles.emptyTxt}>Chưa có cuộc trò chuyện nào</Text>
-              <Text style={styles.emptySub}>Kết bạn rồi nhắn tin để bắt đầu</Text>
+              <Text style={styles.emptyTxt}>
+                {search.trim() ? 'Không tìm thấy cuộc trò chuyện' : 'Chưa có cuộc trò chuyện nào'}
+              </Text>
+              <Text style={styles.emptySub}>
+                {search.trim() ? 'Thử tên hoặc username khác' : 'Kết bạn rồi nhắn tin để bắt đầu'}
+              </Text>
             </View>
           ) : (
             <View style={styles.empty}>
@@ -350,7 +342,7 @@ function createStyles(theme: AppTheme) {
       gap: 10,
       backgroundColor: theme.surface,
     },
-    searchText: { color: theme.muted, fontSize: 17, fontWeight: '500', flex: 1 },
+    searchText: { color: theme.text, fontSize: 17, fontWeight: '500', flex: 1, paddingVertical: 0 },
     sectionHead: {
       flexDirection: 'row',
       justifyContent: 'space-between',

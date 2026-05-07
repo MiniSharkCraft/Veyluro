@@ -44,7 +44,7 @@ func New(cfg Config) *Client {
 		bucket:          cfg.Bucket,
 		publicBaseURL:   strings.TrimRight(cfg.PublicBaseURL, "/"),
 		endpoint:        "https://" + cfg.AccountID + ".r2.cloudflarestorage.com",
-		httpClient:      &http.Client{Timeout: 30 * time.Second},
+		httpClient:      &http.Client{Timeout: 120 * time.Second},
 	}
 }
 

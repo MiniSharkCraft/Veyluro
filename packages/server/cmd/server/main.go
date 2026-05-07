@@ -76,10 +76,6 @@ func main() {
 		cfg.FacebookAppID,
 		mailer,
 	)
-	roomsHandler := rooms.NewHandler(db)
-	msgsHandler := messages.NewHandler(db, hub)
-	notesHandler := notes.NewHandler(db)
-	friendsHandler := friends.NewHandler(db)
 	r2Client := r2.New(r2.Config{
 		AccountID:       cfg.R2AccountID,
 		AccessKeyID:     cfg.R2AccessKeyID,
@@ -87,6 +83,10 @@ func main() {
 		Bucket:          cfg.R2Bucket,
 		PublicBaseURL:   cfg.R2PublicBaseURL,
 	})
+	roomsHandler := rooms.NewHandler(db)
+	msgsHandler := messages.NewHandler(db, hub, r2Client)
+	notesHandler := notes.NewHandler(db)
+	friendsHandler := friends.NewHandler(db)
 	usersHandler := users.NewHandler(db, cfg.JWTSecret, r2Client)
 	callsHandler := calls.NewHandler(cfg.CFTurnTokenID, cfg.CFTurnAPIToken)
 	moderationHandler := moderation.NewHandler(db)
@@ -100,7 +100,7 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(corsMiddleware(cfg.AllowedOrigins))
-	r.Use(middleware.Timeout(30 * time.Second))
+	r.Use(middleware.Timeout(120 * time.Second))
 	r.Use(mw.SecurityHeaders)
 	r.Use(avatarIngressLogger)
 	r.Use(mw.MaxBodySize(512 * 1024))
@@ -198,8 +198,8 @@ func main() {
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      r,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 60 * time.Second,
+		ReadTimeout:  120 * time.Second,
+		WriteTimeout: 120 * time.Second,
 		IdleTimeout:  120 * time.Second,
 	}
 

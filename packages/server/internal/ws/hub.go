@@ -17,12 +17,12 @@ import (
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 4096,
-	CheckOrigin:    func(r *http.Request) bool { return true }, // CORS handled by middleware
+	CheckOrigin:     func(r *http.Request) bool { return true }, // CORS handled by middleware
 }
 
 // Frame là message được gửi qua WebSocket
 type Frame struct {
-	Type   string          `json:"type"`   // "message" | "ack" | "ping" | "pong"
+	Type   string          `json:"type"` // "message" | "ack" | "ping" | "pong"
 	RoomID string          `json:"roomId,omitempty"`
 	Data   json.RawMessage `json:"data,omitempty"`
 }
@@ -95,6 +95,49 @@ func (h *Hub) SendToUserInRoom(toUserID, roomID string, data []byte) bool {
 	return delivered
 }
 
+// SendToUserGlobal sends data only to user-level sockets that are not bound to a room.
+func (h *Hub) SendToUserGlobal(toUserID string, data []byte) bool {
+	h.mu.RLock()
+	set, ok := h.users[toUserID]
+	h.mu.RUnlock()
+	if !ok {
+		return false
+	}
+
+	delivered := false
+	for c := range set {
+		if c.roomID != "" {
+			continue
+		}
+		select {
+		case c.send <- data:
+			delivered = true
+		default:
+			go func(client *Client) { h.unregister <- client }(c)
+		}
+	}
+	return delivered
+}
+
+// BroadcastToRoomMemberGlobals sends a user-level event to every current member of a room.
+func (h *Hub) BroadcastToRoomMemberGlobals(roomID string, data []byte) {
+	if h.db == nil {
+		return
+	}
+	rows, err := h.db.Query(`SELECT user_id FROM room_members WHERE room_id=?`, roomID)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var userID string
+		if rows.Scan(&userID) == nil && userID != "" {
+			h.SendToUserGlobal(userID, data)
+		}
+	}
+}
+
 // BroadcastToRoom gửi data tới tất cả clients trong room (kể cả sender — dùng cho HTTP-triggered push).
 func (h *Hub) BroadcastToRoom(roomID string, data []byte) {
 	h.mu.RLock()
@@ -114,10 +157,12 @@ func (h *Hub) Run() {
 		select {
 		case c := <-h.register:
 			h.mu.Lock()
-			if h.rooms[c.roomID] == nil {
-				h.rooms[c.roomID] = make(map[*Client]struct{})
+			if c.roomID != "" {
+				if h.rooms[c.roomID] == nil {
+					h.rooms[c.roomID] = make(map[*Client]struct{})
+				}
+				h.rooms[c.roomID][c] = struct{}{}
 			}
-			h.rooms[c.roomID][c] = struct{}{}
 			if h.users[c.userID] == nil {
 				h.users[c.userID] = make(map[*Client]struct{})
 			}
@@ -164,11 +209,7 @@ func (h *Hub) Run() {
 func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(auth.ContextKeyUserID).(string)
 	roomID := r.URL.Query().Get("room")
-	if roomID == "" {
-		http.Error(w, "missing room", http.StatusBadRequest)
-		return
-	}
-	if !h.isRoomMember(r, roomID, userID) {
+	if roomID != "" && !h.isRoomMember(r, roomID, userID) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}

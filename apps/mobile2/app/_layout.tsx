@@ -3,25 +3,30 @@ import { install } from 'react-native-quick-crypto'
 install()
 
 import { useEffect } from 'react'
+import { useColorScheme } from 'react-native'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import * as SplashScreen from 'expo-splash-screen'
+import { getTheme } from '../src/lib/theme'
 
 SplashScreen.preventAutoHideAsync()
 
 export default function RootLayout() {
+  const scheme = useColorScheme()
+  const theme = getTheme(scheme)
+
   useEffect(() => {
     SplashScreen.hideAsync()
   }, [])
 
   return (
     <>
-      <StatusBar style="light" backgroundColor="#050508" />
+      <StatusBar style={scheme === 'light' ? 'dark' : 'light'} backgroundColor={theme.bg} />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: '#0D0D14' },
-          headerTintColor: '#818CF8',
-          contentStyle: { backgroundColor: '#08080F' },
+          headerStyle: { backgroundColor: theme.bg },
+          headerTintColor: theme.text,
+          contentStyle: { backgroundColor: theme.bg },
           animation: 'fade',
         }}
       >

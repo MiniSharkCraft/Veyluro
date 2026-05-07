@@ -2,14 +2,16 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet,
-  StatusBar, ActivityIndicator, Modal, Alert,
+  StatusBar, ActivityIndicator, Modal, Alert, Image,
 } from 'react-native'
+import * as ImagePicker from 'expo-image-picker'
 import { useLocalSearchParams, router } from 'expo-router'
 import {
   ArrowLeftIcon,
   DotsThreeVerticalIcon,
   DoorOpenIcon,
   FlagIcon,
+  ImageSquareIcon,
   PaperPlaneTiltIcon,
   PhoneIcon,
   ProhibitIcon,
@@ -30,9 +32,10 @@ const avatarBg = (name: string) => COLORS[(name?.charCodeAt(0) ?? 0) % COLORS.le
 
 export default function RoomScreen() {
   const { roomId } = useLocalSearchParams<{ roomId: string }>()
-  const { messages, members, connected, loading, sendMessage, wsRef } = useChat(roomId)
+  const { messages, members, connected, loading, sendMessage, sendImage, wsRef } = useChat(roomId)
   const [input, setInput] = useState('')
   const [inputH, setInputH] = useState(44)
+  const [imageSending, setImageSending] = useState(false)
   const [myId, setMyId] = useState<string | null>(null)
   const [myUsername, setMyUsername] = useState<string | null>(null)
   const [roomType, setRoomType] = useState<'dm' | 'group'>('dm')
@@ -100,6 +103,42 @@ export default function RoomScreen() {
     sendMessage(input.trim())
     setInput('')
     setInputH(44)
+  }
+
+  const pickImage = async () => {
+    if (imageSending) return
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      if (!perm.granted) {
+        Alert.alert('Thiếu quyền', 'Cho phép truy cập ảnh để gửi ảnh nha.')
+        return
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.9,
+        allowsEditing: false,
+      })
+      if (result.canceled || !result.assets?.[0]) return
+      const asset = result.assets[0]
+      const size = asset.fileSize ?? 0
+      if (size > 50 * 1024 * 1024) {
+        Alert.alert('Ảnh quá lớn', 'Ảnh gửi trong chat tối đa 50MB.')
+        return
+      }
+      const mime = asset.mimeType || guessImageMime(asset.uri, asset.fileName)
+      const ext = extensionFromMime(mime, asset.fileName)
+      setImageSending(true)
+      await sendImage({
+        uri: asset.uri,
+        name: asset.fileName ?? `image.${ext}`,
+        type: mime,
+        size,
+      })
+    } catch (e) {
+      Alert.alert('Lỗi gửi ảnh', e instanceof Error ? e.message : 'Không gửi được ảnh')
+    } finally {
+      setImageSending(false)
+    }
   }
 
   const otherMember = members.find(m => m.id !== myId)
@@ -406,8 +445,15 @@ export default function RoomScreen() {
                     {!item.mine && !grouped && roomType === 'group' && (
                       <Text style={s.senderName}>@{senderName}</Text>
                     )}
-                    <View style={[s.bubble, item.mine ? s.bubbleMine : s.bubbleTheirs, item.pending && { opacity: 0.6 }]}>
-                      <Text style={s.bubbleTxt}>{item.text}</Text>
+                    <View style={[s.bubble, item.attachment && s.imageBubble, item.mine ? s.bubbleMine : s.bubbleTheirs, item.pending && { opacity: 0.6 }]}>
+                      {item.attachment?.kind === 'image' && (
+                        <Image
+                          source={{ uri: item.attachment.localUri || item.attachment.thumbUrl || item.attachment.url }}
+                          style={s.bubbleImage}
+                          resizeMode="cover"
+                        />
+                      )}
+                      {!!item.text && <Text style={[s.bubbleTxt, item.attachment && { marginTop: 8 }]}>{item.text}</Text>}
                       <View style={s.meta}>
                         <Text style={s.metaTime}>{item.time}</Text>
                         {item.mine && (
@@ -425,6 +471,17 @@ export default function RoomScreen() {
         )}
 
         <View style={s.bar}>
+          <TouchableOpacity
+            style={[s.imageBtn, imageSending && { opacity: 0.5 }]}
+            onPress={pickImage}
+            disabled={imageSending}
+            activeOpacity={0.8}
+          >
+            {imageSending
+              ? <ActivityIndicator size="small" color="#818CF8" />
+              : <ImageSquareIcon size={21} color="#818CF8" weight="bold" />
+            }
+          </TouchableOpacity>
           <TextInput
             style={[s.input, { height: Math.max(44, inputH) }]}
             placeholder="Nhắn tin (E2EE)..."
@@ -454,6 +511,28 @@ const mm = StyleSheet.create({
   item:     { paddingVertical: 16, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#12121E', flexDirection: 'row', alignItems: 'center', gap: 10 },
   itemTxt:  { color: '#F1F5F9', fontSize: 15, fontWeight: '500' },
 })
+
+function guessImageMime(uri: string, name?: string | null) {
+  const value = (name || uri).toLowerCase()
+  if (value.endsWith('.png')) return 'image/png'
+  if (value.endsWith('.webp')) return 'image/webp'
+  if (value.endsWith('.gif')) return 'image/gif'
+  if (value.endsWith('.heic')) return 'image/heic'
+  if (value.endsWith('.heif')) return 'image/heif'
+  return 'image/jpeg'
+}
+
+function extensionFromMime(mime: string, name?: string | null) {
+  const lower = (name || '').toLowerCase()
+  const dot = lower.match(/\.([a-z0-9]+)$/)
+  if (dot?.[1]) return dot[1]
+  if (mime === 'image/png') return 'png'
+  if (mime === 'image/webp') return 'webp'
+  if (mime === 'image/gif') return 'gif'
+  if (mime === 'image/heic') return 'heic'
+  if (mime === 'image/heif') return 'heif'
+  return 'jpg'
+}
 
 const bm = StyleSheet.create({
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' },
@@ -509,14 +588,17 @@ const s = StyleSheet.create({
   msgAvatar:   { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
   msgAvatarTxt:{ color: '#fff', fontSize: 11, fontWeight: '700' },
   bubble:      { maxWidth: '76%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
+  imageBubble: { padding: 4, overflow: 'hidden' },
   bubbleMine:  { backgroundColor: '#3730A3', borderBottomRightRadius: 4 },
   bubbleTheirs:{ backgroundColor: '#1A1A2E', borderBottomLeftRadius: 4 },
+  bubbleImage: { width: 220, height: 220, borderRadius: 15, backgroundColor: '#050508' },
   bubbleTxt:   { color: '#F1F5F9', fontSize: 15, lineHeight: 22 },
   meta:        { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 4 },
   metaTime:    { color: 'rgba(241,245,249,0.35)', fontSize: 11 },
   metaTick:    { color: 'rgba(241,245,249,0.35)', fontSize: 11 },
   metaTickRead:{ color: '#818CF8' },
   bar:         { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 10, paddingBottom: Platform.OS === 'ios' ? 24 : 10, backgroundColor: '#0E0E1C', borderTopWidth: 1, borderTopColor: '#12121E' },
+  imageBtn:    { width: 40, height: 40, borderRadius: 20, backgroundColor: '#12121E', alignItems: 'center', justifyContent: 'center', marginRight: 8 },
   input:       { flex: 1, backgroundColor: '#12121E', borderRadius: 22, paddingHorizontal: 16, paddingTop: 11, paddingBottom: 11, color: '#F1F5F9', fontSize: 15, marginRight: 8 },
   sendBtn:     { width: 40, height: 40, borderRadius: 20, backgroundColor: '#12121E', alignItems: 'center', justifyContent: 'center' },
   sendBtnOn:   { backgroundColor: '#6366F1' },

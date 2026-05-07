@@ -80,6 +80,15 @@ export type MessageType = {
   bundle: string
   createdAt: number
 }
+export type AttachmentUploadType = {
+  kind: 'image'
+  url: string
+  thumbUrl?: string
+  key: string
+  mime: string
+  size: number
+  name?: string
+}
 export type StoryType = {
   id: string
   userId: string
@@ -183,6 +192,29 @@ export const messagesApi = {
   send: (roomId: string, bundle: string, clientId?: string) => request<{ id: string; clientId?: string }>(`/api/messages/${roomId}`, {
     method: 'POST', body: JSON.stringify({ bundle, clientId }),
   }),
+  uploadImage: async (roomId: string, file: { uri: string; name: string; type: string }) => {
+    const token = await storage.getToken()
+    if (!token) throw new ApiError(401, 'Chưa đăng nhập')
+    const body = new FormData()
+    body.append('image', {
+      uri: file.uri,
+      name: file.name,
+      type: file.type,
+    } as any)
+    const res = await fetch(`${BASE}/api/messages/${roomId}/attachments`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body,
+    })
+    if (!res.ok) {
+      const parsed = await parseResponseBody(res)
+      throw new ApiError(res.status, responseErrorMessage(parsed, res.status))
+    }
+    return parseResponseBody(res) as Promise<AttachmentUploadType>
+  },
 }
 
 export const storiesApi = {

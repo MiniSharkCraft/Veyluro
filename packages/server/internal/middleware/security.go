@@ -23,7 +23,7 @@ func SecurityHeaders(next http.Handler) http.Handler {
 }
 
 // MaxBodySize limits request body to prevent large payload attacks.
-// auth endpoints: 64KB, general API: 512KB, avatar upload: 25MB file + multipart overhead.
+// auth endpoints: 64KB, general API: 512KB, avatar upload: 25MB, image attachment: 50MB.
 func MaxBodySize(maxBytes int64) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -35,6 +35,8 @@ func MaxBodySize(maxBytes int64) func(http.Handler) http.Handler {
 			limit := maxBytes
 			if r.URL.Path == "/api/users/me/avatar" {
 				limit = 26 * 1024 * 1024
+			} else if strings.HasPrefix(r.URL.Path, "/api/messages/") && strings.HasSuffix(r.URL.Path, "/attachments") {
+				limit = 51 * 1024 * 1024
 			}
 			r.Body = http.MaxBytesReader(w, r.Body, limit)
 			next.ServeHTTP(w, r)
