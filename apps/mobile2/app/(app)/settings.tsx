@@ -1,9 +1,25 @@
 import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar,
   ScrollView, TextInput, Alert, Modal, ActivityIndicator, Share,
+  Image,
 } from 'react-native'
 import { router } from 'expo-router'
 import { useState, useEffect } from 'react'
+import * as ImagePicker from 'expo-image-picker'
+import {
+  ArrowLeftIcon,
+  CameraIcon,
+  CaretRightIcon,
+  KeyIcon,
+  LinkIcon,
+  ProhibitIcon,
+  ShieldCheckIcon,
+  ShieldStarIcon,
+  SignOutIcon,
+  TrashIcon,
+  UserIcon,
+  type Icon,
+} from 'phosphor-react-native'
 import { usersApi, blocksApi, type ProfileType, type BlockedUserType } from '../../src/lib/api'
 import { storage } from '../../src/lib/storage'
 
@@ -14,6 +30,7 @@ export default function SettingsScreen() {
   const [totpModal,   setTotpModal]   = useState(false)
   const [inviteLink,  setInviteLink]  = useState<string | null>(null)
   const [inviteToken, setInviteToken] = useState<string | null>(null)
+  const [avatarLoading, setAvatarLoading] = useState(false)
 
   // Edit fields
   const [newUsername,    setNewUsername]    = useState('')
@@ -67,6 +84,84 @@ export default function SettingsScreen() {
     } catch (e: unknown) {
       Alert.alert('Lỗi', e instanceof Error ? e.message : 'Không lưu được')
     } finally { setEditLoading(false) }
+  }
+
+  const handlePickAvatar = async () => {
+    if (avatarLoading) return
+    setAvatarLoading(true)
+    try {
+      console.log('[avatar] picker open')
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      console.log('[avatar] media permission', perm)
+      if (!perm.granted) {
+        Alert.alert('Thiếu quyền', 'Cho phép truy cập ảnh để đổi avatar nha.')
+        return
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.9,
+      })
+      console.log('[avatar] picker result', result)
+      if (result.canceled || !result.assets?.[0]) {
+        console.log('[avatar] picker canceled or empty')
+        return
+      }
+
+      const asset = result.assets[0]
+      if (asset.fileSize && asset.fileSize > 25 * 1024 * 1024) {
+        Alert.alert('Ảnh quá lớn', 'Avatar tối đa 25MB.')
+        return
+      }
+
+      const type = asset.mimeType ?? guessImageType(asset.uri)
+      const ext = type.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg'
+      console.log('[avatar] picked', {
+        uri: asset.uri,
+        fileName: asset.fileName,
+        fileSize: asset.fileSize,
+        mimeType: asset.mimeType,
+        width: asset.width,
+        height: asset.height,
+      })
+      const uploaded = await usersApi.uploadAvatar({
+        uri: asset.uri,
+        name: asset.fileName ?? `avatar.${ext}`,
+        type,
+      })
+      setProfile(p => p ? { ...p, avatarUrl: uploaded.avatarUrl, avatarThumbUrl: uploaded.avatarThumbUrl } : p)
+      await load()
+      Alert.alert('Đã cập nhật', 'Ảnh đại diện đã được upload lên server.')
+    } catch (e: unknown) {
+      console.warn('[avatar] upload error', e)
+      Alert.alert('Lỗi avatar', e instanceof Error ? e.message : 'Upload ảnh thất bại')
+    } finally {
+      setAvatarLoading(false)
+    }
+  }
+
+  const handleDeleteAvatar = async () => {
+    if (!profile?.avatarUrl || avatarLoading) return
+    Alert.alert('Xóa avatar?', 'Ảnh đại diện hiện tại sẽ bị xóa.', [
+      { text: 'Hủy', style: 'cancel' },
+      {
+        text: 'Xóa', style: 'destructive',
+        onPress: async () => {
+          setAvatarLoading(true)
+          try {
+            await usersApi.deleteAvatar()
+            setProfile(p => p ? { ...p, avatarUrl: undefined, avatarThumbUrl: undefined } : p)
+            await load()
+          } catch (e: unknown) {
+            Alert.alert('Lỗi', e instanceof Error ? e.message : 'Không xóa được avatar')
+          } finally {
+            setAvatarLoading(false)
+          }
+        },
+      },
+    ])
   }
 
   const handleGetInviteLink = async () => {
@@ -152,7 +247,7 @@ export default function SettingsScreen() {
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Text style={s.backTxt}>‹</Text>
+          <ArrowLeftIcon size={23} color="#A5B4FC" weight="bold" />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Cài đặt</Text>
         <View style={{ width: 36 }} />
@@ -162,22 +257,37 @@ export default function SettingsScreen() {
 
         {/* Profile card */}
         <View style={s.profileCard}>
-          <View style={[s.bigAvatar, { backgroundColor: '#1E1B4B' }]}>
-            <Text style={s.bigAvatarTxt}>{(profile?.displayName ?? profile?.username ?? '?')[0]?.toUpperCase()}</Text>
-          </View>
+          <TouchableOpacity style={s.avatarPress} onPress={handlePickAvatar} activeOpacity={0.82}>
+            {profile?.avatarUrl ? (
+              <Image source={{ uri: profile.avatarThumbUrl || profile.avatarUrl }} style={s.bigAvatarImg} />
+            ) : (
+              <View style={[s.bigAvatar, { backgroundColor: '#1E1B4B' }]}>
+                <Text style={s.bigAvatarTxt}>{(profile?.displayName ?? profile?.username ?? '?')[0]?.toUpperCase()}</Text>
+              </View>
+            )}
+            <View style={s.avatarEditBadge}>
+              {avatarLoading ? <ActivityIndicator color="#fff" size="small" /> : <CameraIcon size={15} color="#fff" weight="bold" />}
+            </View>
+          </TouchableOpacity>
           <Text style={s.displayName}>{profile?.displayName || profile?.username}</Text>
           {profile?.displayName && <Text style={s.usernameLabel}>@{profile.username}</Text>}
           {profile?.bio && <Text style={s.bioTxt}>{profile.bio}</Text>}
           <TouchableOpacity style={s.editProfileBtn} onPress={() => setEditModal(true)}>
             <Text style={s.editProfileTxt}>Chỉnh sửa hồ sơ</Text>
           </TouchableOpacity>
+          {profile?.avatarUrl && (
+            <TouchableOpacity style={s.deleteAvatarBtn} onPress={handleDeleteAvatar}>
+              <TrashIcon size={14} color="#EF4444" weight="bold" />
+              <Text style={s.deleteAvatarTxt}>Xóa ảnh đại diện</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Invite link section */}
         <SectionTitle title="Kết bạn" />
         <View style={s.section}>
           <SettingRow
-            icon="🔗"
+            icon={UserIcon}
             label="Username của bạn"
             value={`@${profile?.username}`}
             onPress={async () => {
@@ -198,7 +308,7 @@ export default function SettingsScreen() {
               </View>
             </View>
           ) : (
-            <SettingRow icon="📎" label="Tạo link kết bạn" onPress={handleGetInviteLink} chevron />
+            <SettingRow icon={LinkIcon} label="Tạo link kết bạn" onPress={handleGetInviteLink} chevron />
           )}
         </View>
 
@@ -206,7 +316,7 @@ export default function SettingsScreen() {
         <SectionTitle title="Bảo mật" />
         <View style={s.section}>
           <SettingRow
-            icon="🔐"
+            icon={ShieldCheckIcon}
             label="Xác thực 2 bước (2FA)"
             value={profile?.totpEnabled ? 'Đang bật' : 'Tắt'}
             valueStyle={profile?.totpEnabled ? s.valueOn : s.valueOff}
@@ -218,7 +328,7 @@ export default function SettingsScreen() {
             chevron
           />
           <SettingRow
-            icon="🔑"
+            icon={KeyIcon}
             label="Khôi phục khóa E2EE"
             value="Dùng PIN 6 số"
             onPress={() => router.push('/(auth)/recover-key')}
@@ -230,7 +340,7 @@ export default function SettingsScreen() {
         <SectionTitle title="Người dùng bị chặn" />
         <View style={s.section}>
           <SettingRow
-            icon="🚫"
+            icon={ProhibitIcon}
             label="Đang chặn"
             value={blocked.length > 0 ? `${blocked.length} người` : 'Không có ai'}
             onPress={() => setBlockedModal(true)}
@@ -244,7 +354,7 @@ export default function SettingsScreen() {
             <SectionTitle title="Quản trị viên" />
             <View style={s.section}>
               <SettingRow
-                icon="🛡️"
+                icon={ShieldStarIcon}
                 label="Xem báo cáo vi phạm"
                 onPress={() => router.push('/(app)/admin' as any)}
                 chevron
@@ -257,7 +367,7 @@ export default function SettingsScreen() {
         <SectionTitle title="Tài khoản" />
         <View style={s.section}>
           <TouchableOpacity style={s.logoutRow} onPress={handleLogout} activeOpacity={0.7}>
-            <Text style={s.logoutIco}>⏻</Text>
+            <SignOutIcon size={20} color="#EF4444" weight="bold" style={s.logoutIco} />
             <Text style={s.logoutTxt}>Đăng xuất</Text>
           </TouchableOpacity>
         </View>
@@ -409,46 +519,59 @@ function SectionTitle({ title }: { title: string }) {
   )
 }
 
-function SettingRow({ icon, label, value, valueStyle, onPress, chevron }: {
-  icon: string; label: string; value?: string; valueStyle?: object
+function SettingRow({ icon: IconComponent, label, value, valueStyle, onPress, chevron }: {
+  icon: Icon; label: string; value?: string; valueStyle?: object
   onPress?: () => void; chevron?: boolean
 }) {
   return (
     <TouchableOpacity style={s.settingRow} onPress={onPress} activeOpacity={0.7}>
-      <Text style={s.settingIcon}>{icon}</Text>
+      <View style={s.settingIcon}>
+        <IconComponent size={19} color="#94A3B8" weight="bold" />
+      </View>
       <Text style={s.settingLabel}>{label}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         {value && <Text style={[s.settingValue, valueStyle]}>{value}</Text>}
-        {chevron && <Text style={s.settingChevron}>›</Text>}
+        {chevron && <CaretRightIcon size={17} color="#374151" weight="bold" />}
       </View>
     </TouchableOpacity>
   )
+}
+
+function guessImageType(uri: string) {
+  const lower = uri.toLowerCase()
+  if (lower.endsWith('.png')) return 'image/png'
+  if (lower.endsWith('.webp')) return 'image/webp'
+  if (lower.endsWith('.gif')) return 'image/gif'
+  return 'image/jpeg'
 }
 
 const s = StyleSheet.create({
   root:           { flex: 1, backgroundColor: '#08080F' },
   header:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
   backBtn:        { width: 36, height: 36, justifyContent: 'center' },
-  backTxt:        { color: '#818CF8', fontSize: 28, fontWeight: '300' },
   headerTitle:    { flex: 1, color: '#F1F5F9', fontSize: 18, fontWeight: '700', textAlign: 'center' },
   profileCard:    { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 24, marginHorizontal: 16, marginTop: 8, marginBottom: 4, backgroundColor: '#0E0E1C', borderRadius: 20, borderWidth: 1, borderColor: '#1A1A2E' },
-  bigAvatar:      { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  avatarPress:    { width: 88, height: 88, marginBottom: 12 },
+  bigAvatar:      { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center' },
+  bigAvatarImg:   { width: 88, height: 88, borderRadius: 44, backgroundColor: '#12121E' },
   bigAvatarTxt:   { color: '#818CF8', fontSize: 32, fontWeight: '700' },
+  avatarEditBadge:{ position: 'absolute', right: 0, bottom: 0, width: 28, height: 28, borderRadius: 14, backgroundColor: '#6366F1', alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#0E0E1C' },
   displayName:    { color: '#F1F5F9', fontSize: 20, fontWeight: '700', marginBottom: 2 },
   usernameLabel:  { color: '#6366F1', fontSize: 13, marginBottom: 6 },
   bioTxt:         { color: '#64748B', fontSize: 13, textAlign: 'center', lineHeight: 18, marginBottom: 8 },
   editProfileBtn: { marginTop: 8, backgroundColor: '#1E1B4B', borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10 },
   editProfileTxt: { color: '#818CF8', fontSize: 14, fontWeight: '600' },
+  deleteAvatarBtn:{ marginTop: 10, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  deleteAvatarTxt:{ color: '#EF4444', fontSize: 13, fontWeight: '600' },
   sectionTitle:   { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8 },
   sectionTitleTxt:{ color: '#374151', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
   section:        { marginHorizontal: 16, backgroundColor: '#0E0E1C', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#1A1A2E' },
   settingRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#12121E' },
-  settingIcon:    { fontSize: 18, marginRight: 12, width: 26, textAlign: 'center' },
+  settingIcon:    { marginRight: 12, width: 26, alignItems: 'center' },
   settingLabel:   { flex: 1, color: '#E2E8F0', fontSize: 15 },
   settingValue:   { color: '#64748B', fontSize: 13 },
   valueOn:        { color: '#22C55E', fontWeight: '600' },
   valueOff:       { color: '#64748B' },
-  settingChevron: { color: '#374151', fontSize: 20 },
   inviteLinkBox:  { paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#12121E' },
   inviteLinkLabel:{ color: '#64748B', fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 6 },
   inviteLinkTxt:  { color: '#818CF8', fontSize: 13, fontFamily: 'monospace', marginBottom: 10 },
@@ -456,7 +579,7 @@ const s = StyleSheet.create({
   inviteActionBtn:{ flex: 1, backgroundColor: '#12121E', borderRadius: 10, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: '#1E1E30' },
   inviteActionTxt:{ color: '#94A3B8', fontSize: 13, fontWeight: '600' },
   logoutRow:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 15 },
-  logoutIco:      { fontSize: 18, marginRight: 12, width: 26, textAlign: 'center', color: '#EF4444' },
+  logoutIco:      { marginRight: 12, width: 26 },
   logoutTxt:      { color: '#EF4444', fontSize: 15, fontWeight: '600' },
   versionTxt:     { color: '#1E1E30', fontSize: 11, textAlign: 'center', marginTop: 28 },
   secretBox:      { backgroundColor: '#0D0D1A', borderRadius: 12, padding: 14, marginBottom: 14 },

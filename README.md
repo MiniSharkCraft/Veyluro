@@ -16,16 +16,16 @@
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react)](https://react.dev)
 [![Expo](https://img.shields.io/badge/Expo-51-000020?logo=expo)](https://expo.dev)
 [![Wails](https://img.shields.io/badge/Wails-v2-ff6b6b)](https://wails.io)
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/G2G11UYLFQ)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
 </div>
 
 ---
 
-## What is AMoon Eclipse?
+## What Is AMoon Eclipse?
 
-AMoon Eclipse is a **zero-knowledge, end-to-end encrypted** messaging platform built as a monorepo for web, mobile, and desktop.
-The server stores ciphertext and metadata required for delivery, but it does not hold the private keys used to decrypt messages.
+AMoon Eclipse is a **zero-knowledge, end-to-end encrypted** messenger built as a monorepo for web, mobile, and desktop.
+The server stores encrypted bundles and delivery metadata, but it does not hold the private keys used to decrypt messages.
 
 - **Web** - React 18 + Vite
 - **Mobile** - React Native + Expo
@@ -36,11 +36,13 @@ Messages are encrypted on the client with **AES-256-GCM**. The per-message sessi
 
 ---
 
-## Support This Project
+## Current State
 
-If you want to support development:
-
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/G2G11UYLFQ)
+- `apps/mobile2` is the main mobile target
+- `apps/mobile` remains as a legacy client for compatibility
+- avatar uploads go to Cloudflare R2
+- shared crypto lives under `packages/common`
+- server API and realtime delivery live under `packages/server`
 
 ---
 
@@ -62,7 +64,7 @@ If you want to support development:
 ┌──────────────────────────────────────────────────┐
 │               GO SERVER (BLIND)                  │
 │                                                  │
-│  Stores encrypted bundles in MySQL.              │
+│  Stores encrypted bundles and metadata.          │
 │  Forwards via WebSocket hub.                     │
 │  Cannot read message plaintext.                  │
 └─────────────────────┬────────────────────────────┘
@@ -79,21 +81,13 @@ If you want to support development:
 └──────────────────────────────────────────────────┘
 ```
 
-### Key Storage by Platform
+### Key Storage
 
 | Platform | Storage | Backed by |
 |----------|---------|-----------|
 | Web | IndexedDB (`idb`) | Browser origin |
 | Desktop | IndexedDB | WebView storage |
 | Mobile | `expo-secure-store` | Android Keystore / iOS Keychain |
-
-### Server-Side Hardening
-
-- scanner auto-ban for common probe paths
-- separate rate limits for auth, API, and WebSocket traffic
-- security headers and request size caps
-- encrypted email storage and HMAC lookup tokens
-- JWT-based auth with protected routes
 
 ---
 
@@ -102,34 +96,13 @@ If you want to support development:
 ```text
 amoon-eclipse/
 ├── apps/
-│   ├── web/                    # React + Vite web app
-│   ├── mobile/                 # legacy Expo client
-│   ├── mobile2/                # current Expo client
-│   └── desktop/
-│       └── wails-app/          # Wails desktop app
-│
+│   ├── web/
+│   ├── mobile/
+│   ├── mobile2/
+│   └── desktop/wails-app/
 ├── packages/
-│   ├── common/                 # shared crypto and types
-│   └── server/                 # Go backend
-│       ├── cmd/server/main.go
-│       └── internal/
-│           ├── auth/
-│           ├── messages/
-│           ├── rooms/
-│           ├── friends/
-│           ├── users/
-│           ├── notes/
-│           ├── calls/
-│           ├── blocks/
-│           ├── moderation/
-│           ├── pending/
-│           ├── ws/
-│           ├── middleware/
-│           ├── crypto/
-│           ├── db/
-│           ├── email/
-│           └── config/
-│
+│   ├── common/
+│   └── server/
 ├── docs/
 └── scripts/
 ```
@@ -151,97 +124,44 @@ amoon-eclipse/
 | Passphrase key recovery | ✅ |
 | User blocking | ✅ |
 | Admin moderation tools | ✅ |
+| Avatar upload to R2 | ✅ |
 | Web client | ✅ |
 | Mobile clients | ✅ |
 | Desktop client | ✅ |
 
 ---
 
-## Quick Start
+## Build And Run
 
-### Prerequisites
+Requirements:
 
 - Node.js 20+
 - pnpm 9+
 - Go 1.23+
 - MySQL 8+ or MariaDB 10.6+
 
-### 1. Clone & Install
+Common commands:
 
 ```bash
-git clone https://github.com/your-org/amoon-eclipse
-cd amoon-eclipse
 pnpm install
-```
-
-### 2. Configure the Database
-
-Create a database, then import the schema:
-
-```bash
-mysql -u youruser -p yourdb < packages/server/internal/db/schema.sql
-```
-
-### 3. Configure the Backend
-
-```bash
-cp packages/server/.env.example packages/server/.env
-```
-
-Fill in the required values in `packages/server/.env`.
-
-### 4. Run the Backend
-
-```bash
-cd packages/server
-go run ./cmd/server
-```
-
-The API listens on port `8080` by default unless overridden.
-
-### 5. Run the Clients
-
-Web:
-
-```bash
 npm run dev:web
-```
-
-Legacy mobile app:
-
-```bash
 npm run dev:mobile
+cd apps/mobile2 && npx expo start
+cd apps/mobile2 && npm run build:apk
+cd apps/desktop/wails-app && wails build
+cd packages/server && go run ./cmd/server
 ```
 
-Current mobile app:
-
-```bash
-cd apps/mobile2
-npx expo start
-```
-
-Desktop frontend build:
-
-```bash
-cd apps/desktop/wails-app/frontend
-npm run build
-```
-
-Desktop app build:
-
-```bash
-cd apps/desktop/wails-app
-wails build
-```
+For release builds, rebuild the server binary and regenerate the mobile APK after any API, crypto, or asset change.
 
 ---
 
-## Environment Variables
+## Configuration
 
-Important backend configuration is documented in:
+See:
 
-- `packages/server/.env.example`
-- `apps/mobile2/.env.example`
+- [`packages/server/.env.example`](packages/server/.env.example)
+- [`apps/mobile2/.env.example`](apps/mobile2/.env.example)
 
 Typical backend values include:
 
@@ -253,20 +173,31 @@ Typical backend values include:
 - `ALLOWED_ORIGINS`
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
-- `SMTP_*`
-- `CF_TURN_*`
+- `R2_ACCOUNT_ID`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+- `R2_BUCKET`
+- `R2_PUBLIC_BASE_URL`
 
 Do not commit local `.env` files or deployment secrets.
 
 ---
 
-## Project Status
+## Deployment
 
-This codebase is still evolving.
+- Keep backend secrets on the server or panel only
+- Use the public API URL in mobile and desktop runtime config
+- Enable Cloudflare image transformations if you want avatar thumbnails
+- Rebuild the Android APK and Wails binary after release-side changes
 
-- `apps/mobile2` is the main mobile target
-- older folders remain for compatibility and migration work
-- messaging, auth, crypto, and cross-platform behavior are still actively refined
+---
+
+## Documentation
+
+- [Changelog](CHANGELOG.md)
+- [Terms of Service](TERMS.md)
+- [Privacy Policy](PRIVACY.md)
+- [Security Policy](SECURITY.md)
 
 ---
 

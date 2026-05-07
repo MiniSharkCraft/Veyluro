@@ -1,5 +1,12 @@
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Vibration } from 'react-native'
 import { useEffect } from 'react'
+import {
+  MicrophoneIcon,
+  MicrophoneSlashIcon,
+  PhoneDisconnectIcon,
+  PhoneIcon,
+  SpeakerHighIcon,
+} from 'phosphor-react-native'
 import { CallState, IncomingCall } from '../hooks/useVoiceCall'
 
 interface Props {
@@ -47,26 +54,26 @@ export default function CallScreen({
         {callState === 'ringing' ? (
           <View style={s.btnRow}>
             <TouchableOpacity style={[s.btn, s.rejectBtn]} onPress={onReject}>
-              <Text style={s.btnIcon}>📵</Text>
+              <PhoneDisconnectIcon size={28} color="#fff" weight="fill" />
             </TouchableOpacity>
             <TouchableOpacity style={[s.btn, s.acceptBtn]} onPress={onAccept}>
-              <Text style={s.btnIcon}>📞</Text>
+              <PhoneIcon size={28} color="#fff" weight="fill" />
             </TouchableOpacity>
           </View>
         ) : (
           <>
             <View style={s.btnRow}>
               <TouchableOpacity style={[s.btn, s.ctrlBtn, isMuted && s.btnActive]} onPress={onToggleMute}>
-                <Text style={s.btnIcon}>{isMuted ? '🔇' : '🎙️'}</Text>
+                {isMuted ? <MicrophoneSlashIcon size={24} color="#A5B4FC" weight="bold" /> : <MicrophoneIcon size={24} color="#94A3B8" weight="bold" />}
                 <Text style={s.btnLabel}>{isMuted ? 'Bỏ tắt' : 'Tắt mic'}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[s.btn, s.ctrlBtn, isSpeaker && s.btnActive]} onPress={onToggleSpeaker}>
-                <Text style={s.btnIcon}>🔊</Text>
+                <SpeakerHighIcon size={24} color={isSpeaker ? '#A5B4FC' : '#94A3B8'} weight="bold" />
                 <Text style={s.btnLabel}>Loa ngoài</Text>
               </TouchableOpacity>
             </View>
             <TouchableOpacity style={[s.btn, s.endBtn]} onPress={onEnd}>
-              <Text style={s.btnIcon}>📵</Text>
+              <PhoneDisconnectIcon size={28} color="#fff" weight="fill" />
             </TouchableOpacity>
           </>
         )}
@@ -88,6 +95,5 @@ const s = StyleSheet.create({
   endBtn:    { backgroundColor: '#DC2626', marginTop: 16 },
   ctrlBtn:   { backgroundColor: '#1E1E30' },
   btnActive: { backgroundColor: '#1E1B4B' },
-  btnIcon:   { fontSize: 28 },
   btnLabel:  { color: '#94A3B8', fontSize: 10, marginTop: 4 },
 })

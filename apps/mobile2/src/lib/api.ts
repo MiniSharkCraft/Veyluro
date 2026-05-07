@@ -18,6 +18,18 @@ async function parseResponseBody(res: Response): Promise<unknown> {
   }
 }
 
+function responseErrorMessage(body: unknown, status: number) {
+  if (body && typeof body === 'object') {
+    return (body as { error?: string; message?: string }).error
+      ?? (body as { error?: string; message?: string }).message
+      ?? `Server ${status}`
+  }
+  if (typeof body === 'string' && body.trim().startsWith('<')) {
+    return `Server trả về HTML thay vì JSON (${status}). Kiểm tra lại API URL/reverse proxy.`
+  }
+  return typeof body === 'string' && body.trim() ? body : `Server ${status}`
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = await storage.getToken()
   const headers: Record<string, string> = {
@@ -29,15 +41,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     const body = await parseResponseBody(res)
     if (body && typeof body === 'object') {
-      const message = (body as { error?: string; message?: string }).error
-        ?? (body as { error?: string; message?: string }).message
-        ?? res.statusText
-      throw new ApiError(res.status, message)
+      throw new ApiError(res.status, responseErrorMessage(body, res.status))
     }
-    if (typeof body === 'string' && body.trim().startsWith('<')) {
-      throw new ApiError(res.status, `Server trả về HTML thay vì JSON (${res.status}). Kiểm tra lại API URL/reverse proxy.`)
-    }
-    throw new ApiError(res.status, typeof body === 'string' && body.trim() ? body : res.statusText)
+    throw new ApiError(res.status, responseErrorMessage(body, res.status))
   }
   const body = await parseResponseBody(res)
   return body as T
@@ -77,6 +83,8 @@ export type MessageType = {
 export type StoryType = {
   id: string
   userId: string
+  username?: string
+  displayName?: string
   content: string
   expiresAt: number
   createdAt: number
@@ -85,6 +93,8 @@ export type FriendType = {
   id: string
   username: string
   displayName?: string
+  avatarUrl?: string
+  avatarThumbUrl?: string
   publicKey?: string
   friendId: string
 }
@@ -99,6 +109,8 @@ export type SearchUserType = {
   id: string
   username: string
   displayName?: string
+  avatarUrl?: string
+  avatarThumbUrl?: string
   publicKey?: string
 }
 export type PendingMessageType = {
@@ -113,6 +125,8 @@ export type ProfileType = {
   username: string
   displayName?: string
   bio?: string
+  avatarUrl?: string
+  avatarThumbUrl?: string
   publicKey?: string
   totpEnabled: boolean
   isAdmin: boolean
@@ -193,6 +207,34 @@ export const usersApi = {
   me: () => request<ProfileType>('/api/users/me'),
   updateProfile: (data: { displayName?: string; bio?: string; username?: string }) =>
     request<UpdateProfileResponse>('/api/users/me', { method: 'PATCH', body: JSON.stringify(data) }),
+  uploadAvatar: async (file: { uri: string; name: string; type: string }) => {
+    const token = await storage.getToken()
+    if (!token) throw new ApiError(401, 'Chưa đăng nhập')
+    const body = new FormData()
+    body.append('avatar', {
+      uri: file.uri,
+      name: file.name,
+      type: file.type,
+    } as any)
+    console.log('[avatar] upload start', { base: BASE, name: file.name, type: file.type, uri: file.uri })
+    const res = await fetch(`${BASE}/api/users/me/avatar`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body,
+    })
+    if (!res.ok) {
+      const parsed = await parseResponseBody(res)
+      console.warn('[avatar] upload failed', res.status, parsed)
+      throw new ApiError(res.status, responseErrorMessage(parsed, res.status))
+    }
+    const parsed = await parseResponseBody(res) as { avatarUrl: string; avatarThumbUrl: string; avatarKey: string }
+    console.log('[avatar] upload ok', parsed)
+    return parsed
+  },
+  deleteAvatar: () => request<{ status: string }>('/api/users/me/avatar', { method: 'DELETE' }),
   inviteLink: () => request<{ token: string; link: string }>('/api/users/invite-link'),
   resolveInvite: (token: string) => request<{ userId: string; username: string }>(`/api/users/invite/${token}`),
   totpSetup: () => request<{ secret: string; url: string }>('/api/users/totp/setup', { method: 'POST' }),

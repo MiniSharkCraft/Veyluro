@@ -107,7 +107,7 @@ export default function RecoverKeyScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={s.warn}>⚠️ Nếu quên passphrase, tin nhắn cũ sẽ không thể đọc lại.</Text>
+        <Text style={s.warn}>Nếu quên passphrase, tin nhắn cũ sẽ không thể đọc lại.</Text>
         <TouchableOpacity onPress={handleLogout} style={{ marginTop: 20, alignItems: 'center' }}>
           <Text style={{ color: '#374151', fontSize: 13 }}>← Đăng xuất</Text>
         </TouchableOpacity>

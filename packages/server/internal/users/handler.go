@@ -1,15 +1,21 @@
 package users
 
 import (
+	"bytes"
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	"amoon-eclipse/server/internal/auth"
+	"amoon-eclipse/server/internal/r2"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -19,10 +25,13 @@ import (
 type Handler struct {
 	db        *sql.DB
 	jwtSecret string
+	r2        *r2.Client
 }
 
-func NewHandler(db *sql.DB, jwtSecret string) *Handler {
-	return &Handler{db: db, jwtSecret: jwtSecret}
+const maxAvatarBytes = 25 * 1024 * 1024
+
+func NewHandler(db *sql.DB, jwtSecret string, r2Client *r2.Client) *Handler {
+	return &Handler{db: db, jwtSecret: jwtSecret, r2: r2Client}
 }
 
 func (h *Handler) Routes() chi.Router {
@@ -30,6 +39,8 @@ func (h *Handler) Routes() chi.Router {
 	r.Get("/search", h.search)
 	r.Get("/me", h.me)
 	r.Patch("/me", h.updateProfile)
+	r.Post("/me/avatar", h.uploadAvatar)
+	r.Delete("/me/avatar", h.deleteAvatar)
 	r.Get("/invite-link", h.getOrCreateInviteLink)
 	r.Get("/invite/{token}", h.resolveInvite)
 	r.Post("/totp/setup", h.totpSetup)
@@ -43,6 +54,8 @@ type userResp struct {
 	Username    string `json:"username"`
 	DisplayName string `json:"displayName,omitempty"`
 	Bio         string `json:"bio,omitempty"`
+	AvatarURL   string `json:"avatarUrl,omitempty"`
+	AvatarThumb string `json:"avatarThumbUrl,omitempty"`
 	PublicKey   string `json:"publicKey,omitempty"`
 	TOTPEnabled bool   `json:"totpEnabled"`
 	IsAdmin     bool   `json:"isAdmin"`
@@ -57,7 +70,7 @@ func (h *Handler) search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rows, err := h.db.QueryContext(r.Context(), `
-		SELECT id, username, COALESCE(display_name,''), COALESCE(public_key,'')
+		SELECT id, username, COALESCE(display_name,''), COALESCE(public_key,''), COALESCE(avatar_url,''), COALESCE(avatar_key,'')
 		FROM users
 		WHERE username LIKE ? AND id != ?
 		LIMIT 20
@@ -70,7 +83,9 @@ func (h *Handler) search(w http.ResponseWriter, r *http.Request) {
 	var list []userResp
 	for rows.Next() {
 		var u userResp
-		rows.Scan(&u.ID, &u.Username, &u.DisplayName, &u.PublicKey)
+		var avatarKey string
+		rows.Scan(&u.ID, &u.Username, &u.DisplayName, &u.PublicKey, &u.AvatarURL, &avatarKey)
+		h.decorateAvatar(&u, avatarKey)
 		list = append(list, u)
 	}
 	if list == nil {
@@ -83,16 +98,18 @@ func (h *Handler) search(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 	me := r.Context().Value(auth.ContextKeyUserID).(string)
 	var u userResp
+	var avatarKey string
 	var totpEnabled, isAdmin int
 	err := h.db.QueryRowContext(r.Context(), `
 		SELECT id, username, COALESCE(display_name,''), COALESCE(bio,''),
-		       COALESCE(public_key,''), COALESCE(totp_enabled,0), COALESCE(is_admin,0)
+		       COALESCE(avatar_url,''), COALESCE(avatar_key,''), COALESCE(public_key,''), COALESCE(totp_enabled,0), COALESCE(is_admin,0)
 		FROM users WHERE id=?
-	`, me).Scan(&u.ID, &u.Username, &u.DisplayName, &u.Bio, &u.PublicKey, &totpEnabled, &isAdmin)
+	`, me).Scan(&u.ID, &u.Username, &u.DisplayName, &u.Bio, &u.AvatarURL, &avatarKey, &u.PublicKey, &totpEnabled, &isAdmin)
 	if err != nil {
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
+	h.decorateAvatar(&u, avatarKey)
 	u.TOTPEnabled = totpEnabled == 1
 	u.IsAdmin = isAdmin == 1
 	jsonOK(w, u)
@@ -163,6 +180,135 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 		resp["token"] = token
 	}
 	jsonOK(w, resp)
+}
+
+// POST /api/users/me/avatar — multipart field "avatar" hoặc "file", max 25MB.
+func (h *Handler) uploadAvatar(w http.ResponseWriter, r *http.Request) {
+	if h.r2 == nil {
+		log.Printf("[avatar] rejected: R2 not configured")
+		jsonError(w, "R2 chưa cấu hình", http.StatusServiceUnavailable)
+		return
+	}
+
+	me := r.Context().Value(auth.ContextKeyUserID).(string)
+	log.Printf("[avatar] upload start user=%s contentLength=%d contentType=%q", me, r.ContentLength, r.Header.Get("Content-Type"))
+	if err := r.ParseMultipartForm(maxAvatarBytes + 1024*1024); err != nil {
+		log.Printf("[avatar] multipart parse failed user=%s err=%v", me, err)
+		jsonError(w, "ảnh quá lớn hoặc multipart không hợp lệ", http.StatusBadRequest)
+		return
+	}
+
+	file, header, err := r.FormFile("avatar")
+	if err != nil {
+		file, header, err = r.FormFile("file")
+	}
+	if err != nil {
+		log.Printf("[avatar] missing file user=%s err=%v", me, err)
+		jsonError(w, "thiếu file avatar", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	if header.Size > maxAvatarBytes {
+		log.Printf("[avatar] file too large user=%s filename=%q size=%d", me, header.Filename, header.Size)
+		jsonError(w, "avatar tối đa 25MB", http.StatusRequestEntityTooLarge)
+		return
+	}
+	data, err := io.ReadAll(io.LimitReader(file, maxAvatarBytes+1))
+	if err != nil {
+		log.Printf("[avatar] read failed user=%s filename=%q err=%v", me, header.Filename, err)
+		jsonError(w, "không đọc được file", http.StatusBadRequest)
+		return
+	}
+	if len(data) == 0 {
+		log.Printf("[avatar] empty file user=%s filename=%q", me, header.Filename)
+		jsonError(w, "file rỗng", http.StatusBadRequest)
+		return
+	}
+	if len(data) > maxAvatarBytes {
+		log.Printf("[avatar] file too large after read user=%s filename=%q size=%d", me, header.Filename, len(data))
+		jsonError(w, "avatar tối đa 25MB", http.StatusRequestEntityTooLarge)
+		return
+	}
+
+	contentType, ext, ok := detectAvatarType(data)
+	if !ok {
+		log.Printf("[avatar] unsupported type user=%s filename=%q detected=%q size=%d", me, header.Filename, http.DetectContentType(data), len(data))
+		jsonError(w, "chỉ hỗ trợ JPEG, PNG, WebP hoặc GIF", http.StatusBadRequest)
+		return
+	}
+
+	var oldKey string
+	h.db.QueryRowContext(r.Context(), `SELECT COALESCE(avatar_key,'') FROM users WHERE id=?`, me).Scan(&oldKey)
+
+	key := fmt.Sprintf("avatars/%s/%s%s", me, uuid.NewString(), ext)
+	avatarURL, err := h.r2.PutObject(r.Context(), key, contentType, data)
+	if err != nil {
+		log.Printf("[avatar] R2 upload failed user=%s key=%s type=%s size=%d err=%v", me, key, contentType, len(data), err)
+		jsonError(w, "upload R2 thất bại", http.StatusBadGateway)
+		return
+	}
+
+	if _, err := h.db.ExecContext(r.Context(), `UPDATE users SET avatar_url=?, avatar_key=? WHERE id=?`, avatarURL, key, me); err != nil {
+		log.Printf("[avatar] DB update failed user=%s key=%s err=%v", me, key, err)
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	if oldKey != "" && oldKey != key {
+		go h.r2.DeleteObject(context.Background(), oldKey)
+	}
+	log.Printf("[avatar] upload ok user=%s key=%s type=%s size=%d url=%s", me, key, contentType, len(data), avatarURL)
+
+	jsonOK(w, map[string]string{
+		"avatarUrl":      avatarURL,
+		"avatarThumbUrl": h.avatarThumbURL(key, avatarURL),
+		"avatarKey":      key,
+	})
+}
+
+// DELETE /api/users/me/avatar
+func (h *Handler) deleteAvatar(w http.ResponseWriter, r *http.Request) {
+	me := r.Context().Value(auth.ContextKeyUserID).(string)
+	var oldKey string
+	h.db.QueryRowContext(r.Context(), `SELECT COALESCE(avatar_key,'') FROM users WHERE id=?`, me).Scan(&oldKey)
+	if _, err := h.db.ExecContext(r.Context(), `UPDATE users SET avatar_url=NULL, avatar_key=NULL WHERE id=?`, me); err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	if h.r2 != nil && oldKey != "" {
+		go h.r2.DeleteObject(context.Background(), oldKey)
+	}
+	jsonOK(w, map[string]string{"status": "deleted"})
+}
+
+func detectAvatarType(data []byte) (contentType string, ext string, ok bool) {
+	contentType = http.DetectContentType(data)
+	switch contentType {
+	case "image/jpeg":
+		return contentType, ".jpg", true
+	case "image/png":
+		return contentType, ".png", true
+	case "image/gif":
+		return contentType, ".gif", true
+	}
+	if len(data) >= 12 && bytes.Equal(data[0:4], []byte("RIFF")) && bytes.Equal(data[8:12], []byte("WEBP")) {
+		return "image/webp", ".webp", true
+	}
+	return "", "", false
+}
+
+func (h *Handler) decorateAvatar(u *userResp, avatarKey string) {
+	if u.AvatarURL == "" {
+		return
+	}
+	u.AvatarThumb = h.avatarThumbURL(avatarKey, u.AvatarURL)
+}
+
+func (h *Handler) avatarThumbURL(key, fallback string) string {
+	if h.r2 == nil || key == "" {
+		return fallback
+	}
+	return h.r2.TransformURL(key, 256, 256)
 }
 
 // GET /api/users/invite-link — get or create invite link

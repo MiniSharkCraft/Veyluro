@@ -29,21 +29,24 @@ func (h *Handler) Routes() chi.Router {
 }
 
 type noteResp struct {
-	ID        string `json:"id"`
-	UserID    string `json:"userId"`
-	Content   string `json:"content"`
-	ExpiresAt int64  `json:"expiresAt"`
-	CreatedAt int64  `json:"createdAt"`
+	ID          string `json:"id"`
+	UserID      string `json:"userId"`
+	Username    string `json:"username"`
+	DisplayName string `json:"displayName,omitempty"`
+	Content     string `json:"content"`
+	ExpiresAt   int64  `json:"expiresAt"`
+	CreatedAt   int64  `json:"createdAt"`
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().Unix()
 
 	rows, err := h.db.QueryContext(r.Context(), `
-		SELECT id, user_id, content, expires_at, created_at
-		FROM notes
-		WHERE expires_at > ?
-		ORDER BY created_at DESC
+		SELECT n.id, n.user_id, u.username, COALESCE(u.display_name, ''), n.content, n.expires_at, n.created_at
+		FROM notes n
+		JOIN users u ON u.id = n.user_id
+		WHERE n.expires_at > ?
+		ORDER BY n.created_at DESC
 		LIMIT 50
 	`, now)
 	if err != nil {
@@ -55,7 +58,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	var notes []noteResp
 	for rows.Next() {
 		var n noteResp
-		rows.Scan(&n.ID, &n.UserID, &n.Content, &n.ExpiresAt, &n.CreatedAt)
+		rows.Scan(&n.ID, &n.UserID, &n.Username, &n.DisplayName, &n.Content, &n.ExpiresAt, &n.CreatedAt)
 		notes = append(notes, n)
 	}
 	if notes == nil {

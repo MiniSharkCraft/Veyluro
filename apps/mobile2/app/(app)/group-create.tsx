@@ -5,6 +5,7 @@ import {
   ActivityIndicator, Alert,
 } from 'react-native'
 import { router } from 'expo-router'
+import { ArrowLeftIcon, CheckIcon, UsersThreeIcon, XIcon } from 'phosphor-react-native'
 import { friendsApi, type FriendType } from '../../src/lib/api'
 import { useRooms } from '../../src/hooks/useRooms'
 
@@ -59,7 +60,7 @@ export default function GroupCreateScreen() {
 
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Text style={s.backArrow}>‹</Text>
+          <ArrowLeftIcon size={23} color="#818CF8" weight="bold" />
         </TouchableOpacity>
         <Text style={s.title}>Tạo nhóm mới</Text>
         <TouchableOpacity
@@ -74,7 +75,7 @@ export default function GroupCreateScreen() {
       {/* Group name input */}
       <View style={s.nameBox}>
         <View style={s.groupIcon}>
-          <Text style={{ fontSize: 22 }}>👥</Text>
+          <UsersThreeIcon size={23} color="#818CF8" weight="fill" />
         </View>
         <TextInput
           style={s.nameInput}
@@ -92,7 +93,8 @@ export default function GroupCreateScreen() {
         <View style={s.chipsRow}>
           {Array.from(selected).map(u => (
             <TouchableOpacity key={u} style={s.chip} onPress={() => toggle(u)}>
-              <Text style={s.chipTxt}>@{u} ✕</Text>
+              <Text style={s.chipTxt}>@{u}</Text>
+              <XIcon size={12} color="#818CF8" weight="bold" />
             </TouchableOpacity>
           ))}
         </View>
@@ -125,7 +127,7 @@ export default function GroupCreateScreen() {
                   {item.displayName && <Text style={s.rowSub}>{item.displayName}</Text>}
                 </View>
                 <View style={[s.check, on && s.checkOn]}>
-                  {on && <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>✓</Text>}
+                  {on && <CheckIcon size={15} color="#fff" weight="bold" />}
                 </View>
               </TouchableOpacity>
             )
@@ -140,7 +142,6 @@ const s = StyleSheet.create({
   root:        { flex: 1, backgroundColor: '#08080F' },
   header:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#12121E' },
   backBtn:     { padding: 4, marginRight: 8 },
-  backArrow:   { color: '#818CF8', fontSize: 30, fontWeight: '200' },
   title:       { flex: 1, color: '#F1F5F9', fontSize: 18, fontWeight: '700' },
   createBtn:   { backgroundColor: '#1E1B4B', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 8 },
   createBtnTxt:{ color: '#818CF8', fontSize: 14, fontWeight: '700' },
@@ -148,7 +149,7 @@ const s = StyleSheet.create({
   groupIcon:   { marginRight: 12 },
   nameInput:   { flex: 1, color: '#F1F5F9', fontSize: 16, fontWeight: '600' },
   chipsRow:    { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 8, marginBottom: 12 },
-  chip:        { backgroundColor: '#1E1B4B', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  chip:        { backgroundColor: '#1E1B4B', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 6 },
   chipTxt:     { color: '#818CF8', fontSize: 13, fontWeight: '600' },
   sectionLabel:{ color: '#4B5563', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, paddingHorizontal: 16, marginBottom: 8 },
   row:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#0D0D1A' },

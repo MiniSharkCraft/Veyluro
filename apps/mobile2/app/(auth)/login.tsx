@@ -367,7 +367,7 @@ export default function LoginScreen() {
                     <Field label="Xác nhận PIN" value={confirmPassphrase} onChange={t => setConfirmPassphrase(t.replace(/\D/g,'').slice(0,6))}
                       placeholder="nhập lại 6 số..." focused={focused} focusKey="cpp"
                       onFocus={() => setFocused('cpp')} onBlur={() => setFocused(null)} secure keyboardType="numeric" />
-                    <Text style={s.passphraseHint}>⚠️ Ghi nhớ PIN 6 số này — quên sẽ mất tin nhắn cũ khi đổi thiết bị.</Text>
+                    <Text style={s.passphraseHint}>Ghi nhớ PIN 6 số này. Quên PIN sẽ mất tin nhắn cũ khi đổi thiết bị.</Text>
                   </>
                 )}
                 <TouchableOpacity style={[s.oauthBtn, isLoading && { opacity: 0.6 }]} onPress={handleGoogle} disabled={isLoading} activeOpacity={0.85}>
@@ -380,7 +380,7 @@ export default function LoginScreen() {
                       </View>
                     )}
                 </TouchableOpacity>
-                <Text style={s.hint}>🔒 Khóa mã hóa tạo ngay trên thiết bị.</Text>
+                <Text style={s.hint}>Khóa mã hóa được tạo ngay trên thiết bị.</Text>
               </View>
             ) : (
               <View>
@@ -403,7 +403,7 @@ export default function LoginScreen() {
                     <Field label="Xác nhận PIN" value={confirmPassphrase} onChange={t => setConfirmPassphrase(t.replace(/\D/g,'').slice(0,6))}
                       placeholder="nhập lại 6 số..." focused={focused} focusKey="cpp"
                       onFocus={() => setFocused('cpp')} onBlur={() => setFocused(null)} secure keyboardType="numeric" />
-                    <Text style={s.passphraseHint}>⚠️ PIN bảo vệ khóa E2EE. Quên = mất tin nhắn cũ khi đổi thiết bị.</Text>
+                    <Text style={s.passphraseHint}>PIN bảo vệ khóa E2EE. Quên PIN sẽ mất tin nhắn cũ khi đổi thiết bị.</Text>
                   </>
                 )}
                 <TouchableOpacity style={[s.btn, isLoading && { opacity: 0.6 }]} onPress={handlePassword} disabled={isLoading} activeOpacity={0.85}>

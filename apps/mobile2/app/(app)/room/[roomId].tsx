@@ -5,6 +5,17 @@ import {
   StatusBar, ActivityIndicator, Modal, Alert,
 } from 'react-native'
 import { useLocalSearchParams, router } from 'expo-router'
+import {
+  ArrowLeftIcon,
+  DotsThreeVerticalIcon,
+  DoorOpenIcon,
+  FlagIcon,
+  PaperPlaneTiltIcon,
+  PhoneIcon,
+  ProhibitIcon,
+  UserIcon,
+  UsersThreeIcon,
+} from 'phosphor-react-native'
 import { useChat } from '../../../src/hooks/useChat'
 import { storage } from '../../../src/lib/storage'
 import { useVoiceCall } from '../../../src/hooks/useVoiceCall'
@@ -164,12 +175,12 @@ export default function RoomScreen() {
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
-          <Text style={s.backArrow}>‹</Text>
+          <ArrowLeftIcon size={24} color="#818CF8" weight="bold" />
         </TouchableOpacity>
 
         {roomType === 'group' ? (
           <View style={[s.avatar, { backgroundColor: '#1E1B4B' }]}>
-            <Text style={{ fontSize: 18 }}>👥</Text>
+            <UsersThreeIcon size={20} color="#A5B4FC" weight="fill" />
           </View>
         ) : (
           <View style={[s.avatar, { backgroundColor: avatarBg(displayTitle) }]}>
@@ -194,7 +205,7 @@ export default function RoomScreen() {
             onPress={() => startCall(otherMember.id, otherMember.username, roomId)}
             activeOpacity={0.7}
           >
-            <Text style={s.headerBtnIco}>📞</Text>
+            <PhoneIcon size={19} color="#A5B4FC" weight="bold" />
           </TouchableOpacity>
         )}
 
@@ -205,20 +216,20 @@ export default function RoomScreen() {
             onPress={() => myUsername && startGroupCall(roomId, myUsername)}
             activeOpacity={0.7}
           >
-            <Text style={s.headerBtnIco}>📞</Text>
+            <PhoneIcon size={19} color="#A5B4FC" weight="bold" />
           </TouchableOpacity>
         )}
 
         {/* Members list (group) */}
         {roomType === 'group' && (
           <TouchableOpacity style={s.headerBtn} onPress={() => setMemberModal(true)} activeOpacity={0.7}>
-            <Text style={s.headerBtnIco}>👤</Text>
+            <UserIcon size={19} color="#A5B4FC" weight="bold" />
           </TouchableOpacity>
         )}
 
         {/* Menu */}
         <TouchableOpacity style={s.headerBtn} onPress={() => setMenuModal(true)} activeOpacity={0.7}>
-          <Text style={s.headerBtnIco}>⋮</Text>
+          <DotsThreeVerticalIcon size={21} color="#A5B4FC" weight="bold" />
         </TouchableOpacity>
       </View>
 
@@ -259,16 +270,19 @@ export default function RoomScreen() {
             {roomType === 'dm' && otherMember && (
               <>
                 <TouchableOpacity style={mm.item} onPress={() => { setMenuModal(false); setReportTarget(otherMember); setReportModal(true) }}>
-                  <Text style={mm.itemTxt}>⚠️  Báo cáo @{otherMember.username}</Text>
+                  <FlagIcon size={17} color="#E2E8F0" weight="bold" />
+                  <Text style={mm.itemTxt}>Báo cáo @{otherMember.username}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={mm.item} onPress={() => { setMenuModal(false); handleBlock(otherMember) }}>
-                  <Text style={[mm.itemTxt, { color: '#EF4444' }]}>🚫  Chặn @{otherMember.username}</Text>
+                  <ProhibitIcon size={17} color="#EF4444" weight="bold" />
+                  <Text style={[mm.itemTxt, { color: '#EF4444' }]}>Chặn @{otherMember.username}</Text>
                 </TouchableOpacity>
               </>
             )}
             {roomType === 'group' && (
               <TouchableOpacity style={mm.item} onPress={() => { setMenuModal(false); handleLeaveGroup() }}>
-                <Text style={[mm.itemTxt, { color: '#EF4444' }]}>🚪  Rời nhóm</Text>
+                <DoorOpenIcon size={17} color="#EF4444" weight="bold" />
+                <Text style={[mm.itemTxt, { color: '#EF4444' }]}>Rời nhóm</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity style={[mm.item, { borderBottomWidth: 0 }]} onPress={() => setMenuModal(false)}>
@@ -295,7 +309,7 @@ export default function RoomScreen() {
                 {m.id !== myId && (
                   <View style={{ flexDirection: 'row', gap: 6 }}>
                     <TouchableOpacity style={bm.reportBtn} onPress={() => { setMemberModal(false); setReportTarget(m); setReportModal(true) }}>
-                      <Text style={bm.reportBtnTxt}>⚠️</Text>
+                      <FlagIcon size={15} color="#F59E0B" weight="bold" />
                     </TouchableOpacity>
                     {isGroupAdmin && (
                       <TouchableOpacity style={bm.kickBtn} onPress={() => { setMemberModal(false); handleKickMember(m) }}>
@@ -323,9 +337,9 @@ export default function RoomScreen() {
             {(['harassment', 'spam', 'inappropriate', 'other'] as const).map(r => (
               <TouchableOpacity key={r} style={[rm.reasonBtn, reportReason === r && rm.reasonBtnOn]} onPress={() => setReportReason(r)}>
                 <Text style={[rm.reasonTxt, reportReason === r && rm.reasonTxtOn]}>
-                  {r === 'harassment' ? '😡 Quấy rối / Nhắn nhiều' :
-                   r === 'spam'       ? '📢 Spam' :
-                   r === 'inappropriate' ? '🚫 Nội dung không phù hợp' : '❓ Lý do khác'}
+                  {r === 'harassment' ? 'Quấy rối / Nhắn nhiều' :
+                   r === 'spam'       ? 'Spam' :
+                   r === 'inappropriate' ? 'Nội dung không phù hợp' : 'Lý do khác'}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -373,7 +387,7 @@ export default function RoomScreen() {
             onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: false })}
             ListEmptyComponent={
               <View style={{ alignItems: 'center', paddingTop: 60 }}>
-                <Text style={{ color: '#374151', fontSize: 13 }}>Chưa có tin nhắn · Bắt đầu nào 👋</Text>
+                <Text style={{ color: '#374151', fontSize: 13 }}>Chưa có tin nhắn · Bắt đầu nào</Text>
               </View>
             }
             renderItem={({ item, index }) => {
@@ -426,7 +440,7 @@ export default function RoomScreen() {
             disabled={!input.trim()}
             activeOpacity={0.8}
           >
-            <Text style={[s.sendIco, input.trim() && s.sendIcoOn]}>↑</Text>
+            <PaperPlaneTiltIcon size={19} color={input.trim() ? '#fff' : '#4B5563'} weight="fill" />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -437,7 +451,7 @@ export default function RoomScreen() {
 const mm = StyleSheet.create({
   overlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end', paddingBottom: 40 },
   menu:     { marginHorizontal: 16, backgroundColor: '#0E0E1C', borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#1A1A2E' },
-  item:     { paddingVertical: 16, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#12121E' },
+  item:     { paddingVertical: 16, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#12121E', flexDirection: 'row', alignItems: 'center', gap: 10 },
   itemTxt:  { color: '#F1F5F9', fontSize: 15, fontWeight: '500' },
 })
 
@@ -451,7 +465,6 @@ const bm = StyleSheet.create({
   avatarTxt:   { color: '#fff', fontSize: 15, fontWeight: '700' },
   memberName:  { flex: 1, color: '#F1F5F9', fontSize: 15, fontWeight: '500' },
   reportBtn:   { padding: 8, backgroundColor: '#1C1208', borderRadius: 8 },
-  reportBtnTxt:{ fontSize: 16 },
   kickBtn:     { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#1A0A0A', borderRadius: 8 },
   kickBtnTxt:  { color: '#EF4444', fontSize: 13, fontWeight: '600' },
   closeBtn:    { marginTop: 16, backgroundColor: '#12121E', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
@@ -480,7 +493,6 @@ const s = StyleSheet.create({
   root:        { flex: 1, backgroundColor: '#08080F' },
   header:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0E0E1C', paddingHorizontal: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#12121E' },
   backBtn:     { padding: 6, marginRight: 2 },
-  backArrow:   { color: '#818CF8', fontSize: 30, fontWeight: '200' },
   avatar:      { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
   avatarTxt:   { color: '#fff', fontSize: 16, fontWeight: '700' },
   headerInfo:  { flex: 1 },
@@ -489,7 +501,6 @@ const s = StyleSheet.create({
   connDot:     { width: 6, height: 6, borderRadius: 3, marginRight: 5 },
   statusTxt:   { color: '#64748B', fontSize: 12 },
   headerBtn:   { marginLeft: 6, padding: 7 },
-  headerBtnIco:{ fontSize: 18 },
   senderName:  { color: '#6366F1', fontSize: 11, fontWeight: '600', marginBottom: 2, marginLeft: 2 },
   msgList:     { paddingHorizontal: 12, paddingVertical: 12 },
   msgRow:      { flexDirection: 'row', alignItems: 'flex-end', marginTop: 8 },
@@ -509,6 +520,4 @@ const s = StyleSheet.create({
   input:       { flex: 1, backgroundColor: '#12121E', borderRadius: 22, paddingHorizontal: 16, paddingTop: 11, paddingBottom: 11, color: '#F1F5F9', fontSize: 15, marginRight: 8 },
   sendBtn:     { width: 40, height: 40, borderRadius: 20, backgroundColor: '#12121E', alignItems: 'center', justifyContent: 'center' },
   sendBtnOn:   { backgroundColor: '#6366F1' },
-  sendIco:     { color: '#2E2E45', fontSize: 20, fontWeight: '600' },
-  sendIcoOn:   { color: '#fff' },
 })

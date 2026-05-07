@@ -3,13 +3,34 @@ import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   StyleSheet, SafeAreaView, StatusBar,
   Alert, ActivityIndicator, RefreshControl, Share,
+  Image,
 } from 'react-native'
 import { router } from 'expo-router'
+import {
+  ChatCircleIcon,
+  CheckIcon,
+  EnvelopeSimpleIcon,
+  LinkIcon,
+  MagnifyingGlassIcon,
+  UserPlusIcon,
+  UsersThreeIcon,
+  XIcon,
+} from 'phosphor-react-native'
 import { friendsApi, usersApi, type FriendType, type FriendRequestType, type SearchUserType } from '../../../src/lib/api'
 import { useRooms } from '../../../src/hooks/useRooms'
 
 const COLORS = ['#4C1D95','#1E3A5F','#831843','#064E3B','#7C2D12','#1E293B']
 const avatarBg = (name: string) => COLORS[(name?.charCodeAt(0) ?? 0) % COLORS.length]
+
+function Avatar({ user }: { user: { username: string; avatarThumbUrl?: string; avatarUrl?: string } }) {
+  const src = user.avatarThumbUrl || user.avatarUrl
+  if (src) return <Image source={{ uri: src }} style={s.avatarImg} />
+  return (
+    <View style={[s.avatar, { backgroundColor: avatarBg(user.username) }]}>
+      <Text style={s.avatarTxt}>{user.username[0].toUpperCase()}</Text>
+    </View>
+  )
+}
 
 type Subtab = 'all' | 'requests' | 'find'
 
@@ -139,7 +160,7 @@ export default function FriendsScreen() {
           ListEmptyComponent={
             !loading ? (
               <View style={s.empty}>
-                <Text style={s.emptyIco}>👥</Text>
+                <UsersThreeIcon size={44} color="#374151" weight="duotone" />
                 <Text style={s.emptyTxt}>Chưa có bạn bè nào</Text>
                 <Text style={s.emptySub}>Tìm người bạn quen ở tab "Tìm kiếm"</Text>
               </View>
@@ -147,9 +168,7 @@ export default function FriendsScreen() {
           }
           renderItem={({ item }: { item: FriendType }) => (
             <View style={s.row}>
-              <View style={[s.avatar, { backgroundColor: avatarBg(item.username) }]}>
-                <Text style={s.avatarTxt}>{item.username[0].toUpperCase()}</Text>
-              </View>
+              <Avatar user={item} />
               <View style={s.rowInfo}>
                 <Text style={s.rowName}>@{item.username}</Text>
                 <Text style={s.rowSub}>Bạn bè · E2EE</Text>
@@ -162,7 +181,7 @@ export default function FriendsScreen() {
                 >
                   {dmLoading === item.username
                     ? <ActivityIndicator color="#818CF8" size="small" />
-                    : <Text style={s.msgBtnTxt}>💬</Text>
+                    : <ChatCircleIcon size={18} color="#A5B4FC" weight="bold" />
                   }
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => removeFriend(item.friendId, item.username)} style={s.removeBtn}>
@@ -183,16 +202,14 @@ export default function FriendsScreen() {
           ListEmptyComponent={
             !loading ? (
               <View style={s.empty}>
-                <Text style={s.emptyIco}>📬</Text>
+                <EnvelopeSimpleIcon size={44} color="#374151" weight="duotone" />
                 <Text style={s.emptyTxt}>Không có lời mời nào</Text>
               </View>
             ) : <ActivityIndicator color="#6366F1" style={{ marginTop: 40 }} />
           }
           renderItem={({ item }: { item: FriendRequestType }) => (
             <View style={s.row}>
-              <View style={[s.avatar, { backgroundColor: avatarBg(item.username) }]}>
-                <Text style={s.avatarTxt}>{item.username[0].toUpperCase()}</Text>
-              </View>
+              <Avatar user={item} />
               <View style={s.rowInfo}>
                 <Text style={s.rowName}>@{item.username}</Text>
                 <Text style={s.rowSub}>Muốn kết bạn với bạn</Text>
@@ -205,11 +222,11 @@ export default function FriendsScreen() {
                 >
                   {actionId === item.id
                     ? <ActivityIndicator color="#818CF8" size="small" />
-                    : <Text style={s.acceptBtnTxt}>✓</Text>
+                    : <CheckIcon size={18} color="#A5B4FC" weight="bold" />
                   }
                 </TouchableOpacity>
                 <TouchableOpacity style={s.rejectBtn} onPress={() => declineRequest(item.id)}>
-                  <Text style={s.rejectBtnTxt}>✕</Text>
+                  <XIcon size={17} color="#64748B" weight="bold" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -221,7 +238,10 @@ export default function FriendsScreen() {
         <View style={{ flex: 1 }}>
           {/* Invite link banner */}
           <View style={s.inviteBox}>
-            <Text style={s.inviteTitle}>🔗 Link kết bạn của bạn</Text>
+            <View style={s.inviteTitleRow}>
+              <LinkIcon size={17} color="#818CF8" weight="bold" />
+              <Text style={s.inviteTitle}>Link kết bạn của bạn</Text>
+            </View>
             {inviteLink ? (
               <>
                 <Text style={s.inviteLinkTxt} numberOfLines={1}>{inviteLink}</Text>
@@ -242,7 +262,7 @@ export default function FriendsScreen() {
           </View>
 
           <View style={s.findSearch}>
-            <Text style={s.searchIco}>⌕</Text>
+            <MagnifyingGlassIcon size={18} color="#4B5563" weight="bold" />
             <TextInput
               style={s.searchInput}
               placeholder="Tìm theo username..."
@@ -260,7 +280,7 @@ export default function FriendsScreen() {
             ListEmptyComponent={
               search.trim() ? (
                 <View style={s.empty}>
-                  <Text style={s.emptyIco}>🔍</Text>
+                  <MagnifyingGlassIcon size={44} color="#374151" weight="duotone" />
                   <Text style={s.emptyTxt}>Không tìm thấy ai</Text>
                 </View>
               ) : (
@@ -271,9 +291,7 @@ export default function FriendsScreen() {
             }
             renderItem={({ item }: { item: SearchUserType }) => (
               <View style={s.row}>
-                <View style={[s.avatar, { backgroundColor: avatarBg(item.username) }]}>
-                  <Text style={s.avatarTxt}>{item.username[0].toUpperCase()}</Text>
-                </View>
+                <Avatar user={item} />
                 <View style={s.rowInfo}>
                   <Text style={s.rowName}>@{item.username}</Text>
                 </View>
@@ -284,7 +302,7 @@ export default function FriendsScreen() {
                 >
                   {actionId === item.username
                     ? <ActivityIndicator color="#818CF8" size="small" />
-                    : <Text style={s.addBtnTxt}>+ Thêm</Text>
+                    : <View style={s.addBtnInner}><UserPlusIcon size={14} color="#818CF8" weight="bold" /><Text style={s.addBtnTxt}>Thêm</Text></View>
                   }
                 </TouchableOpacity>
               </View>
@@ -308,32 +326,30 @@ const s = StyleSheet.create({
   subtabTxtOn: { color: '#818CF8' },
   row:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
   avatar:      { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  avatarImg:   { width: 48, height: 48, borderRadius: 24, marginRight: 12, backgroundColor: '#12121E' },
   avatarTxt:   { color: '#fff', fontSize: 18, fontWeight: '700' },
   rowInfo:     { flex: 1 },
   rowName:     { color: '#F1F5F9', fontSize: 15, fontWeight: '600' },
   rowSub:      { color: '#64748B', fontSize: 13, marginTop: 2 },
   msgBtn:      { backgroundColor: '#1E1B4B', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, minWidth: 36, alignItems: 'center' },
-  msgBtnTxt:   { fontSize: 16 },
   removeBtn:   { backgroundColor: '#1A0A0A', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   removeBtnTxt:{ color: '#EF4444', fontSize: 12, fontWeight: '600' },
   acceptBtn:   { width: 36, height: 36, borderRadius: 18, backgroundColor: '#1E1B4B', alignItems: 'center', justifyContent: 'center' },
-  acceptBtnTxt:{ color: '#818CF8', fontSize: 16, fontWeight: '700' },
   rejectBtn:   { width: 36, height: 36, borderRadius: 18, backgroundColor: '#1A0A0A', alignItems: 'center', justifyContent: 'center' },
-  rejectBtnTxt:{ color: '#EF4444', fontSize: 14 },
-  addBtn:      { backgroundColor: '#1E1B4B', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
+  addBtn:      { backgroundColor: '#1E1B4B', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, minWidth: 78, alignItems: 'center' },
+  addBtnInner: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   addBtnTxt:   { color: '#818CF8', fontSize: 13, fontWeight: '700' },
   inviteBox:    { marginHorizontal: 16, marginBottom: 12, backgroundColor: '#0E0E1C', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#1E3A5F' },
-  inviteTitle:  { color: '#818CF8', fontSize: 14, fontWeight: '700', marginBottom: 8 },
+  inviteTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  inviteTitle:  { color: '#818CF8', fontSize: 14, fontWeight: '700' },
   inviteLinkTxt:{ color: '#6366F1', fontSize: 12, fontFamily: 'monospace', marginBottom: 4 },
   inviteBtn:    { flex: 1, backgroundColor: '#12121E', borderRadius: 10, paddingVertical: 9, alignItems: 'center', borderWidth: 1, borderColor: '#1E1E30' },
   inviteBtnTxt: { color: '#94A3B8', fontSize: 13, fontWeight: '600' },
   inviteGenBtn: { backgroundColor: '#1E1B4B', borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginTop: 4 },
   inviteGenTxt: { color: '#818CF8', fontSize: 13, fontWeight: '600' },
   findSearch:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#12121E', marginHorizontal: 16, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 8 },
-  searchIco:   { color: '#2E2E45', fontSize: 18, marginRight: 8 },
-  searchInput: { flex: 1, color: '#F1F5F9', fontSize: 15 },
+  searchInput: { flex: 1, color: '#F1F5F9', fontSize: 15, marginLeft: 8 },
   empty:       { alignItems: 'center', paddingTop: 60, paddingHorizontal: 40 },
-  emptyIco:    { fontSize: 48, marginBottom: 12 },
   emptyTxt:    { color: '#4B5563', fontSize: 15, marginBottom: 6 },
   emptySub:    { color: '#374151', fontSize: 13, textAlign: 'center' },
 })

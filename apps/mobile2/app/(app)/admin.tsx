@@ -5,6 +5,7 @@ import {
 } from 'react-native'
 import { router } from 'expo-router'
 import { useState, useEffect, useCallback } from 'react'
+import { CheckCircleIcon } from 'phosphor-react-native'
 import { moderationApi, type ReportType } from '../../src/lib/api'
 
 export default function AdminScreen() {
@@ -70,7 +71,7 @@ export default function AdminScreen() {
         ListEmptyComponent={
           !loading ? (
             <View style={s.empty}>
-              <Text style={{ fontSize: 40, marginBottom: 12 }}>🎉</Text>
+              <CheckCircleIcon size={44} color="#22C55E" weight="duotone" />
               <Text style={s.emptyTxt}>Không có báo cáo nào đang chờ</Text>
             </View>
           ) : null

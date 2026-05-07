@@ -1,4 +1,20 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import {
+  ChatCircle,
+  CircleDashed,
+  GearSix,
+  LockSimple,
+  MagnifyingGlass,
+  Note,
+  NotePencil,
+  PaperPlaneTilt,
+  Phone,
+  Plus,
+  ShieldStar,
+  SignOut,
+  Tray,
+  UsersThree,
+} from '@phosphor-icons/react'
 import { useAuthStore, API, WS_BASE } from '../stores/authStore'
 import { encryptMessage, decryptMessage, encryptPrivateKeyWithPassphrase } from '../lib/crypto'
 
@@ -56,27 +72,27 @@ export function ChatPage() {
   const hdr = authHdr(token!)
 
   const navItems: Array<{ key: Tab; icon: JSX.Element; label: string; show?: boolean }> = [
-    { key: 'chats',    icon: <IconChat />,     label: 'Chats'    },
-    { key: 'friends',  icon: <IconFriends />,  label: 'Friends'  },
-    { key: 'pending',  icon: <IconInbox />,    label: 'Pending'  },
-    { key: 'stories',  icon: <IconStories />,  label: 'Stories'  },
-    { key: 'notes',    icon: <IconNotes />,    label: 'Notes'    },
-    { key: 'calls',    icon: <IconPhone />,    label: 'Calls'    },
-    { key: 'settings', icon: <IconSettings />, label: 'Settings' },
-    { key: 'admin',    icon: <IconAdmin />,    label: 'Admin', show: profile?.isAdmin },
+    { key: 'chats',    icon: <ChatCircle size={22} weight="bold" />,  label: 'Chats'    },
+    { key: 'friends',  icon: <UsersThree size={22} weight="bold" />,  label: 'Friends'  },
+    { key: 'pending',  icon: <Tray size={22} weight="bold" />,        label: 'Pending'  },
+    { key: 'stories',  icon: <CircleDashed size={22} weight="bold" />, label: 'Stories'  },
+    { key: 'notes',    icon: <Note size={22} weight="bold" />,        label: 'Notes'    },
+    { key: 'calls',    icon: <Phone size={22} weight="bold" />,       label: 'Calls'    },
+    { key: 'settings', icon: <GearSix size={22} weight="bold" />,     label: 'Settings' },
+    { key: 'admin',    icon: <ShieldStar size={22} weight="bold" />,  label: 'Admin', show: profile?.isAdmin },
   ]
 
   return (
-    <div className="flex h-screen bg-[#08080F] text-white overflow-hidden">
+    <div className="flex h-screen bg-[var(--app-bg)] text-[var(--app-text)] overflow-hidden">
       {/* Sidebar */}
-      <nav className="w-14 shrink-0 bg-[#0E0E1C] border-r border-[#1E1E30] flex flex-col items-center py-3 gap-1">
-        <div className="w-9 h-9 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center mb-2 shrink-0">
-          <span className="text-indigo-400 text-xs font-black">A</span>
+      <nav className="w-14 shrink-0 bg-[var(--app-panel)] border-r border-[var(--app-border-soft)] flex flex-col items-center py-3 gap-1">
+        <div className="w-9 h-9 rounded-full bg-[var(--app-brand-soft)] flex items-center justify-center mb-2 shrink-0">
+          <span className="text-[var(--app-brand)] text-xs font-black">A</span>
         </div>
         {navItems.filter(n => n.show !== false).map(({ key, icon, label }) => (
           <button key={key} title={label} onClick={() => setTab(key)}
             className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
-              tab === key ? 'bg-indigo-500/20 text-indigo-400' : 'text-[#4B5563] hover:text-white hover:bg-[#1E1E30]'
+              tab === key ? 'bg-[var(--app-brand-soft)] text-[var(--app-brand)]' : 'text-[var(--app-text-faint)] hover:text-[var(--app-text)] hover:bg-[var(--app-panel-2)]'
             }`}>
             {icon}
           </button>
@@ -86,8 +102,8 @@ export function ChatPage() {
           <Avatar name={username ?? '?'} size={40} />
         </button>
         <button title="Sign out" onClick={logout}
-          className="w-10 h-10 rounded-xl flex items-center justify-center text-[#4B5563] hover:text-red-400 hover:bg-red-950/30 transition-all">
-          <IconLogout />
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-[var(--app-text-faint)] hover:text-red-400 hover:bg-red-500/10 transition-all">
+          <SignOut size={20} weight="bold" />
         </button>
       </nav>
 
@@ -264,28 +280,54 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
   return (
     <>
       {/* Room list */}
-      <div className="w-72 shrink-0 border-r border-[#1E1E30] flex flex-col bg-[#0E0E1C]">
-        <div className="p-4 border-b border-[#1E1E30]">
+      <div className="w-80 shrink-0 border-r border-[var(--app-border-soft)] flex flex-col bg-[var(--app-panel)]">
+        <div className="p-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-white font-bold text-base">Chats</h2>
+            <h2 className="text-[var(--app-text)] font-black text-2xl tracking-normal">Chats</h2>
             <button onClick={() => setShowNew(s => !s)}
-              className="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 text-lg flex items-center justify-center hover:bg-indigo-500/30 transition-all">
-              +
+              className="w-9 h-9 rounded-full bg-[var(--app-panel-2)] text-[var(--app-text)] flex items-center justify-center hover:bg-[var(--app-brand-soft)] hover:text-[var(--app-brand)] transition-all">
+              <NotePencil size={18} weight="bold" />
             </button>
           </div>
-          <input className="w-full bg-[#12121E] border border-[#1E1E30] rounded-xl px-3 py-2 text-sm text-white placeholder:text-[#4B5563] focus:outline-none focus:border-indigo-500/50 transition-colors"
-            placeholder="Search users..." value={search} onChange={e => setSearch(e.target.value)} />
+          <div className="relative">
+            <MagnifyingGlass size={18} weight="bold" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--app-text-faint)]" />
+            <input className="w-full bg-[var(--app-panel-2)] border border-transparent rounded-full pl-10 pr-3 py-3 text-sm text-[var(--app-text)] placeholder:text-[var(--app-text-faint)] focus:outline-none focus:border-[var(--app-brand)]/40 transition-colors"
+              placeholder="Ask AMoon AI or search" value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="px-4 pb-4 border-b border-[var(--app-border-soft)]">
+          <div className="flex gap-4 overflow-x-auto pb-1">
+            <button className="w-[68px] shrink-0 text-left">
+              <div className="w-14 h-14 rounded-full bg-[var(--app-panel-2)] flex items-center justify-center mb-2">
+                <Plus size={20} weight="bold" className="text-[var(--app-text)]" />
+              </div>
+              <p className="text-[11px] font-semibold text-[var(--app-text-soft)] truncate">My note</p>
+            </button>
+            {rooms.slice(0, 8).map(r => (
+              <button key={r.id} onClick={() => openRoom(r)} className="w-[76px] shrink-0 text-center">
+                <div className="relative inline-flex flex-col items-center">
+                  <div className="max-w-[86px] min-h-8 rounded-2xl px-2 py-1 bg-[var(--app-panel-2)] text-[11px] leading-3 font-bold text-[var(--app-text)] mb-[-10px] z-10">
+                    {r.type === 'group' ? 'Group E2EE' : 'E2EE'}
+                  </div>
+                  <Avatar name={roomDisplayName(r)} size={58} />
+                  <span className="absolute right-1 bottom-0 w-3.5 h-3.5 rounded-full bg-green-500 border-[3px] border-[var(--app-panel)]" />
+                </div>
+                <p className="mt-2 text-[11px] font-semibold text-[var(--app-text)] truncate">{roomDisplayName(r)}</p>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Search results */}
         {results.length > 0 && (
-          <div className="border-b border-[#1E1E30]">
-            <p className="px-4 py-2 text-xs text-[#4B5563] uppercase tracking-wider">Start chat</p>
+          <div className="border-b border-[var(--app-border-soft)]">
+            <p className="px-4 py-2 text-xs text-[var(--app-text-faint)] uppercase tracking-wider">Start chat</p>
             {results.map(u => (
               <button key={u.id} onClick={() => startDM(u)}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#12121E] transition-colors">
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--app-panel-2)] transition-colors">
                 <Avatar name={u.username} />
-                <span className="text-sm text-white">@{u.username}</span>
+                <span className="text-sm text-[var(--app-text)]">@{u.username}</span>
               </button>
             ))}
           </div>
@@ -293,14 +335,14 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
 
         {/* New chat / group panel */}
         {showNew && results.length === 0 && (
-          <div className="border-b border-[#1E1E30] p-3 space-y-2">
+          <div className="border-b border-[var(--app-border-soft)] p-3 space-y-2">
             <div className="flex gap-1.5 mb-2">
-              <button onClick={() => setGrpMode(false)} className={`flex-1 py-1 text-xs rounded-lg ${!grpMode ? 'bg-indigo-500/20 text-indigo-400' : 'text-[#4B5563] hover:text-white'}`}>DM</button>
-              <button onClick={() => setGrpMode(true)} className={`flex-1 py-1 text-xs rounded-lg ${grpMode ? 'bg-indigo-500/20 text-indigo-400' : 'text-[#4B5563] hover:text-white'}`}>Group</button>
+              <button onClick={() => setGrpMode(false)} className={`flex-1 py-1 text-xs rounded-lg ${!grpMode ? 'bg-[var(--app-brand-soft)] text-[var(--app-brand)]' : 'text-[var(--app-text-faint)] hover:text-[var(--app-text)]'}`}>DM</button>
+              <button onClick={() => setGrpMode(true)} className={`flex-1 py-1 text-xs rounded-lg ${grpMode ? 'bg-[var(--app-brand-soft)] text-[var(--app-brand)]' : 'text-[var(--app-text-faint)] hover:text-[var(--app-text)]'}`}>Group</button>
             </div>
             {grpMode && (
               <div className="space-y-2">
-                <input className="w-full bg-[#12121E] border border-[#1E1E30] rounded-xl px-3 py-1.5 text-sm text-white placeholder:text-[#4B5563] focus:outline-none focus:border-indigo-500/50"
+                <input className="w-full bg-[var(--app-panel-2)] border border-transparent rounded-xl px-3 py-1.5 text-sm text-[var(--app-text)] placeholder:text-[var(--app-text-faint)] focus:outline-none focus:border-[var(--app-brand)]/40"
                   placeholder="Group name..." value={grpName} onChange={e => setGrpName(e.target.value)} />
                 {grpSel.length > 0 && (
                   <div className="flex flex-wrap gap-1">
@@ -312,7 +354,7 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
                     ))}
                   </div>
                 )}
-                <input className="w-full bg-[#12121E] border border-[#1E1E30] rounded-xl px-3 py-1.5 text-sm text-white placeholder:text-[#4B5563] focus:outline-none focus:border-indigo-500/50"
+                <input className="w-full bg-[var(--app-panel-2)] border border-transparent rounded-xl px-3 py-1.5 text-sm text-[var(--app-text)] placeholder:text-[var(--app-text-faint)] focus:outline-none focus:border-[var(--app-brand)]/40"
                   placeholder="Add members..." onChange={async e => {
                     const q = e.target.value
                     if (!q.trim()) return
@@ -333,26 +375,27 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
         )}
 
         {/* Room list */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto px-2 py-2">
           {rooms.length === 0 && (
             <EmptyState icon="💬" text="No conversations" sub="Search for someone above" />
           )}
           {rooms.map(r => (
             <button key={r.id} onClick={() => openRoom(r)}
-              className={`w-full flex items-center gap-3 px-4 py-3 transition-colors ${
-                active?.id === r.id ? 'bg-indigo-500/10 border-l-2 border-indigo-500' : 'hover:bg-[#12121E] border-l-2 border-transparent'
+              className={`w-full flex items-center gap-3 px-3 py-3 rounded-2xl transition-colors ${
+                active?.id === r.id ? 'bg-[var(--app-brand-soft)] text-[var(--app-brand)]' : 'hover:bg-[var(--app-panel-2)]'
               }`}>
               <Avatar name={roomDisplayName(r)} />
               <div className="flex-1 min-w-0 text-left">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-white truncate">
-                    {r.type === 'group' && <span className="text-indigo-400/70 text-xs mr-1">#</span>}
+                  <p className="text-sm font-bold text-[var(--app-text)] truncate">
+                    {r.type === 'group' && <UsersThree size={13} weight="bold" className="inline mr-1 text-[var(--app-brand)]" />}
                     {roomDisplayName(r)}
                   </p>
-                  {r.lastMessageAt ? <span className="text-[10px] text-[#4B5563] shrink-0 ml-1">{fmt(r.lastMessageAt)}</span> : null}
+                  {r.lastMessageAt ? <span className="text-[10px] text-[var(--app-text-faint)] shrink-0 ml-1">{fmt(r.lastMessageAt)}</span> : null}
                 </div>
-                <p className="text-xs text-[#4B5563] truncate">
-                  {r.type === 'group' ? `${r.memberCount ?? '?'} members` : 'E2EE · click to open'}
+                <p className="text-xs text-[var(--app-text-faint)] truncate flex items-center gap-1">
+                  {r.type === 'group' ? <UsersThree size={12} weight="bold" /> : <LockSimple size={12} weight="bold" />}
+                  <span>{r.type === 'group' ? `${r.memberCount ?? '?'} members · E2EE` : 'E2EE · click to open'}</span>
                 </p>
               </div>
             </button>
@@ -361,13 +404,13 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
       </div>
 
       {/* Chat area */}
-      <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 bg-[var(--app-bg)]">
         {active ? (
           <>
-            <header className="flex items-center gap-3 px-6 py-3 border-b border-[#1E1E30] bg-[#0E0E1C] shrink-0">
+            <header className="flex items-center gap-3 px-6 py-3 border-b border-[var(--app-border-soft)] bg-[var(--app-bg)] shrink-0">
               <Avatar name={activeDisplayName} size={38} />
               <div className="flex-1">
-                <p className="font-semibold text-white text-sm">{activeDisplayName}</p>
+                <p className="font-bold text-[var(--app-text)] text-sm">{activeDisplayName}</p>
                 <p className="text-xs text-green-400 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
                   {active.type === 'group' ? `${members.length} members · E2EE` : 'End-to-end encrypted'}
@@ -409,13 +452,13 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
             {sendErr && (
               <p className="text-red-400 text-xs px-4 py-1 bg-red-950/20 border-t border-red-900/30">{sendErr}</p>
             )}
-            <form onSubmit={sendMessage} className="flex items-center gap-3 px-4 py-3 border-t border-[#1E1E30] bg-[#0E0E1C] shrink-0">
+            <form onSubmit={sendMessage} className="flex items-center gap-3 px-4 py-3 border-t border-[var(--app-border-soft)] bg-[var(--app-bg)] shrink-0">
               <input ref={inputRef}
-                className="flex-1 bg-[#12121E] border border-[#1E1E30] rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-[#4B5563] focus:outline-none focus:border-indigo-500/50 transition-colors"
+                className="flex-1 bg-[var(--app-panel)] border border-transparent rounded-full px-4 py-3 text-sm text-[var(--app-text)] placeholder:text-[var(--app-text-faint)] focus:outline-none focus:border-[var(--app-brand)]/40 transition-colors"
                 placeholder="Write a message..." value={input} onChange={e => { setInput(e.target.value); if (sendErr) setSendErr('') }} disabled={sending} />
               <button type="submit" disabled={sending || !input.trim()}
-                className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center hover:bg-indigo-500/30 transition-all disabled:opacity-30">
-                <IconSend />
+                className="w-11 h-11 rounded-full bg-[var(--app-brand-soft)] text-[var(--app-brand)] flex items-center justify-center hover:scale-105 transition-all disabled:opacity-30">
+                <PaperPlaneTilt size={20} weight="fill" />
               </button>
             </form>
           </>

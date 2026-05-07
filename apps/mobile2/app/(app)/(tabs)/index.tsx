@@ -1,13 +1,29 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
-  View, Text, FlatList, TouchableOpacity,
-  StyleSheet, SafeAreaView, StatusBar,
-  ActivityIndicator, RefreshControl,
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useColorScheme,
+  View,
 } from 'react-native'
 import { router } from 'expo-router'
+import {
+  ChatsCircleIcon,
+  GearSixIcon,
+  LockSimpleIcon,
+  MagnifyingGlassIcon,
+  NotePencilIcon,
+  UsersThreeIcon,
+} from 'phosphor-react-native'
 import { useRooms } from '../../../src/hooks/useRooms'
 import { storage } from '../../../src/lib/storage'
-import type { RoomType } from '../../../src/lib/api'
+import { storiesApi, type RoomType, type StoryType } from '../../../src/lib/api'
 
 function formatLastTime(ts: number): string {
   const d = new Date(ts * 1000)
@@ -16,29 +32,42 @@ function formatLastTime(ts: number): string {
     return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
   }
   const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000)
-  if (diffDays < 7) {
-    return d.toLocaleDateString('vi-VN', { weekday: 'short' })
-  }
+  if (diffDays < 7) return d.toLocaleDateString('vi-VN', { weekday: 'short' })
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
 }
 
-const COLORS = ['#4C1D95','#1E3A5F','#831843','#064E3B','#7C2D12','#1E293B']
-const avatarBg = (name: string) => COLORS[(name?.charCodeAt(0) ?? 0) % COLORS.length]
+const avatarColors = ['#0A84FF', '#00A884', '#FF7A1A', '#E9437A', '#7C3AED', '#0891B2']
+const avatarBg = (name: string) => avatarColors[(name?.charCodeAt(0) ?? 0) % avatarColors.length]
 
-function RoomAvatar({ name, type }: { name: string; type: string }) {
-  if (type === 'group') {
-    return (
-      <View style={[s.avatar, { backgroundColor: '#1E1B4B' }]}>
-        <Text style={{ fontSize: 20 }}>👥</Text>
-      </View>
-    )
-  }
-  return (
-    <View style={[s.avatar, { backgroundColor: avatarBg(name) }]}>
-      <Text style={s.avatarTxt}>{name[0]?.toUpperCase() ?? '?'}</Text>
-    </View>
-  )
+const darkTheme = {
+  bg: '#000000',
+  surface: '#1F1F1F',
+  surface2: '#2C2C2E',
+  text: '#F8FAFC',
+  muted: '#B3B3B8',
+  faint: '#77777E',
+  border: '#202024',
+  accent: '#0A84FF',
+  accentSoft: '#102C4D',
+  green: '#22C55E',
+  shadow: 'rgba(0,0,0,0.28)',
 }
+
+const lightTheme = {
+  bg: '#FFFFFF',
+  surface: '#F1F2F4',
+  surface2: '#E7E9EE',
+  text: '#09090B',
+  muted: '#60646C',
+  faint: '#8A8F98',
+  border: '#E5E7EB',
+  accent: '#0A84FF',
+  accentSoft: '#E8F2FF',
+  green: '#16A34A',
+  shadow: 'rgba(15,23,42,0.10)',
+}
+
+type AppTheme = typeof darkTheme
 
 function getRoomDisplayName(room: RoomType, myUsername: string) {
   if (room.type === 'group') return room.name
@@ -47,56 +76,165 @@ function getRoomDisplayName(room: RoomType, myUsername: string) {
   return other ? `@${other.trim()}` : room.name
 }
 
+function RoomAvatar({
+  name,
+  type,
+  theme,
+  size = 56,
+}: {
+  name: string
+  type: RoomType['type']
+  theme: AppTheme
+  size?: number
+}) {
+  const bg = type === 'group' ? theme.accent : avatarBg(name)
+  const fg = '#FFFFFF'
+
+  return (
+    <View style={[s.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: bg }]}>
+      {type === 'group' ? (
+        <UsersThreeIcon size={size * 0.44} color={fg} weight="fill" />
+      ) : (
+        <Text style={[s.avatarTxt, { fontSize: size * 0.38 }]}>{name[0]?.toUpperCase() ?? '?'}</Text>
+      )}
+    </View>
+  )
+}
+
+function NotesRail({
+  notes,
+  theme,
+}: {
+  notes: StoryType[]
+  theme: AppTheme
+}) {
+  const visibleNotes = notes.slice(0, 12)
+  if (visibleNotes.length === 0) return null
+
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={s.notesRail}
+    >
+      {visibleNotes.map(note => {
+        const owner = note.displayName || note.username || 'AMoon'
+        return (
+          <TouchableOpacity
+            key={note.id}
+            activeOpacity={0.75}
+            style={s.noteItem}
+          >
+            <View style={s.noteCard}>
+              <RoomAvatar name={owner} type="dm" theme={theme} size={62} />
+              <View style={[s.noteBubble, { backgroundColor: theme.surface, shadowColor: theme.shadow }]}>
+                <Text style={[s.noteBubbleText, { color: theme.text }]} numberOfLines={2}>
+                  {note.content}
+                </Text>
+              </View>
+              <View style={[s.onlineDot, { backgroundColor: theme.green, borderColor: theme.bg }]} />
+            </View>
+            <Text style={[s.noteName, { color: theme.text }]} numberOfLines={1}>
+              {owner.replace(/^@/, '')}
+            </Text>
+          </TouchableOpacity>
+        )
+      })}
+    </ScrollView>
+  )
+}
+
 export default function ChatsScreen() {
+  const scheme = useColorScheme()
+  const theme = scheme === 'light' ? lightTheme : darkTheme
   const { rooms, loading, refetch } = useRooms()
   const [myUsername, setMyUsername] = useState('')
+  const [notes, setNotes] = useState<StoryType[]>([])
+  const styles = useMemo(() => createStyles(theme), [theme])
+
+  const fetchNotes = async () => {
+    try {
+      setNotes(await storiesApi.list())
+    } catch (e) {
+      console.warn('[notes]', e)
+    }
+  }
 
   useEffect(() => {
-    storage.getUsername().then(u => { if (u) setMyUsername(u) })
+    storage.getUsername().then(u => {
+      if (u) setMyUsername(u)
+    })
+    fetchNotes()
   }, [])
 
   return (
-    <SafeAreaView style={s.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#08080F" />
+    <SafeAreaView style={styles.root}>
+      <StatusBar
+        barStyle={scheme === 'light' ? 'dark-content' : 'light-content'}
+        backgroundColor={theme.bg}
+      />
 
-      <View style={s.header}>
-        <View>
-          <Text style={s.headerSub}>AMoon Eclipse</Text>
-          <Text style={s.headerTitle}>Tin nhắn</Text>
-        </View>
-        <View style={s.headerActions}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>AMoon</Text>
+        <View style={styles.headerActions}>
           <TouchableOpacity
-            style={s.iconBtn}
+            style={styles.iconBtn}
             onPress={() => router.push('/(app)/group-create' as any)}
-            activeOpacity={0.7}
+            activeOpacity={0.75}
           >
-            <Text style={s.iconBtnTxt}>👥</Text>
+            <UsersThreeIcon size={22} color={theme.text} weight="bold" />
           </TouchableOpacity>
           <TouchableOpacity
-            style={s.iconBtn}
+            style={styles.iconBtn}
             onPress={() => router.push('/(app)/settings' as any)}
-            activeOpacity={0.7}
+            activeOpacity={0.75}
           >
-            <Text style={s.iconBtnTxt}>⚙️</Text>
+            <GearSixIcon size={22} color={theme.text} weight="bold" />
           </TouchableOpacity>
         </View>
+      </View>
+
+      <TouchableOpacity activeOpacity={0.8} style={styles.searchPill}>
+        <MagnifyingGlassIcon size={25} color={theme.faint} weight="bold" />
+        <Text style={styles.searchText}>Hỏi AMoon AI hoặc tìm kiếm</Text>
+      </TouchableOpacity>
+
+      <NotesRail notes={notes} theme={theme} />
+
+      <View style={styles.sectionHead}>
+        <View style={styles.sectionTitleWrap}>
+          <ChatsCircleIcon size={20} color={theme.accent} weight="fill" />
+          <Text style={styles.sectionTitle}>Tin nhắn</Text>
+        </View>
+        <TouchableOpacity activeOpacity={0.75} style={styles.composeBtn}>
+          <NotePencilIcon size={19} color={theme.accent} weight="bold" />
+        </TouchableOpacity>
       </View>
 
       <FlatList
         data={rooms}
         keyExtractor={i => i.id}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={refetch} tintColor="#6366F1" />}
-        contentContainerStyle={{ paddingBottom: 20 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={() => {
+              refetch()
+              fetchNotes()
+            }}
+            tintColor={theme.accent}
+          />
+        }
+        contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           !loading ? (
-            <View style={s.empty}>
-              <Text style={s.emptyIco}>💬</Text>
-              <Text style={s.emptyTxt}>Chưa có cuộc trò chuyện nào</Text>
-              <Text style={s.emptySub}>Kết bạn rồi nhắn tin để bắt đầu</Text>
+            <View style={styles.empty}>
+              <ChatsCircleIcon size={54} color={theme.faint} weight="duotone" />
+              <Text style={styles.emptyTxt}>Chưa có cuộc trò chuyện nào</Text>
+              <Text style={styles.emptySub}>Kết bạn rồi nhắn tin để bắt đầu</Text>
             </View>
           ) : (
-            <View style={s.empty}>
-              <ActivityIndicator color="#6366F1" />
+            <View style={styles.empty}>
+              <ActivityIndicator color={theme.accent} />
             </View>
           )
         }
@@ -104,26 +242,35 @@ export default function ChatsScreen() {
           const displayName = myUsername ? getRoomDisplayName(item, myUsername) : item.name
           return (
             <TouchableOpacity
-              style={s.row}
+              style={styles.row}
               onPress={() => router.push(`/(app)/room/${item.id}` as any)}
-              activeOpacity={0.7}
+              activeOpacity={0.72}
             >
-              <RoomAvatar name={displayName} type={item.type} />
-              <View style={s.rowInfo}>
-                <View style={s.rowTop}>
-                  <Text style={s.rowName} numberOfLines={1}>{displayName}</Text>
-                  {item.lastMessageAt
-                    ? <Text style={s.rowTime}>{formatLastTime(item.lastMessageAt)}</Text>
-                    : item.type === 'group' && item.memberCount
-                      ? <View style={s.groupBadge}><Text style={s.groupBadgeTxt}>{item.memberCount} người</Text></View>
-                      : null
-                  }
+              <RoomAvatar name={displayName} type={item.type} theme={theme} />
+              <View style={styles.rowInfo}>
+                <View style={styles.rowTop}>
+                  <Text style={styles.rowName} numberOfLines={1}>
+                    {displayName}
+                  </Text>
+                  {item.lastMessageAt ? (
+                    <Text style={styles.rowTime}>{formatLastTime(item.lastMessageAt)}</Text>
+                  ) : item.type === 'group' && item.memberCount ? (
+                    <View style={styles.groupBadge}>
+                      <Text style={styles.groupBadgeTxt}>{item.memberCount} người</Text>
+                    </View>
+                  ) : null}
                 </View>
-                <Text style={s.rowSub} numberOfLines={1}>
-                  {item.type === 'group' ? '👥 Nhóm · E2EE' : '🔒 E2EE · Bảo mật đầu cuối'}
-                </Text>
+                <View style={styles.rowSubWrap}>
+                  {item.type === 'group' ? (
+                    <UsersThreeIcon size={14} color={theme.faint} weight="bold" />
+                  ) : (
+                    <LockSimpleIcon size={14} color={theme.faint} weight="bold" />
+                  )}
+                  <Text style={styles.rowSub} numberOfLines={1}>
+                    {item.type === 'group' ? 'Nhóm · E2EE' : 'E2EE · Bảo mật đầu cuối'}
+                  </Text>
+                </View>
               </View>
-              <Text style={s.chevron}>›</Text>
             </TouchableOpacity>
           )
         }}
@@ -133,26 +280,119 @@ export default function ChatsScreen() {
 }
 
 const s = StyleSheet.create({
-  root:         { flex: 1, backgroundColor: '#08080F' },
-  header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#0D0D1A' },
-  headerSub:    { color: '#6366F1', fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
-  headerTitle:  { color: '#F1F5F9', fontSize: 26, fontWeight: '800', marginTop: 2 },
-  headerActions:{ flexDirection: 'row', gap: 8, alignItems: 'center' },
-  iconBtn:      { backgroundColor: '#12121E', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9 },
-  iconBtnTxt:   { fontSize: 16 },
-  row:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#0A0A12' },
-  avatar:       { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
-  avatarTxt:    { color: '#fff', fontSize: 20, fontWeight: '700' },
-  rowInfo:      { flex: 1 },
-  rowTop:       { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  rowName:      { color: '#F1F5F9', fontSize: 16, fontWeight: '700', flex: 1 },
-  groupBadge:   { backgroundColor: '#1E1B4B', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
-  groupBadgeTxt:{ color: '#818CF8', fontSize: 11, fontWeight: '700' },
-  rowTime:      { color: '#374151', fontSize: 12 },
-  rowSub:       { color: '#374151', fontSize: 13 },
-  chevron:      { color: '#2E2E45', fontSize: 24, paddingLeft: 8 },
-  empty:        { alignItems: 'center', paddingTop: 80, paddingHorizontal: 40 },
-  emptyIco:     { fontSize: 52, marginBottom: 16 },
-  emptyTxt:     { color: '#4B5563', fontSize: 16, fontWeight: '600', marginBottom: 8 },
-  emptySub:     { color: '#374151', fontSize: 14, textAlign: 'center' },
+  avatar: { alignItems: 'center', justifyContent: 'center' },
+  avatarTxt: { color: '#FFFFFF', fontWeight: '800' },
+  notesRail: { gap: 14, paddingHorizontal: 18, paddingBottom: 14, paddingTop: 2 },
+  noteItem: { alignItems: 'center', width: 78 },
+  noteCard: {
+    width: 78,
+    height: 91,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginBottom: 4,
+  },
+  noteBubble: {
+    position: 'absolute',
+    top: 0,
+    maxWidth: 74,
+    minHeight: 31,
+    borderRadius: 15.5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    zIndex: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  noteBubbleText: { fontSize: 11, fontWeight: '800', textAlign: 'center', lineHeight: 13 },
+  onlineDot: {
+    position: 'absolute',
+    right: 10,
+    bottom: 5,
+    width: 15,
+    height: 15,
+    borderRadius: 7.5,
+    borderWidth: 3,
+  },
+  noteName: { fontSize: 12, fontWeight: '600', maxWidth: 76, textAlign: 'center' },
 })
+
+function createStyles(theme: AppTheme) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: theme.bg },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 18,
+      paddingTop: 10,
+      paddingBottom: 10,
+    },
+    headerTitle: { color: theme.text, fontSize: 32, fontWeight: '900', letterSpacing: 0 },
+    headerActions: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+    iconBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.surface,
+    },
+    searchPill: {
+      minHeight: 48,
+      marginHorizontal: 18,
+      marginBottom: 12,
+      paddingHorizontal: 16,
+      borderRadius: 24,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: theme.surface,
+    },
+    searchText: { color: theme.muted, fontSize: 17, fontWeight: '500', flex: 1 },
+    sectionHead: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 18,
+      paddingTop: 4,
+      paddingBottom: 4,
+    },
+    sectionTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    sectionTitle: { color: theme.text, fontSize: 18, fontWeight: '800' },
+    composeBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.accentSoft,
+    },
+    listContent: { paddingHorizontal: 8, paddingBottom: 24 },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 10,
+      paddingVertical: 10,
+      borderRadius: 16,
+      gap: 12,
+    },
+    rowInfo: { flex: 1, minWidth: 0 },
+    rowTop: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 },
+    rowName: { color: theme.text, fontSize: 16, fontWeight: '700', flex: 1 },
+    groupBadge: {
+      backgroundColor: theme.accentSoft,
+      borderRadius: 999,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    groupBadgeTxt: { color: theme.accent, fontSize: 11, fontWeight: '800' },
+    rowTime: { color: theme.faint, fontSize: 12, fontWeight: '600' },
+    rowSubWrap: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    rowSub: { color: theme.faint, fontSize: 13, fontWeight: '600', flex: 1 },
+    empty: { alignItems: 'center', paddingTop: 64, paddingHorizontal: 40 },
+    emptyTxt: { color: theme.text, fontSize: 16, fontWeight: '800', marginTop: 14, marginBottom: 8 },
+    emptySub: { color: theme.faint, fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  })
+}

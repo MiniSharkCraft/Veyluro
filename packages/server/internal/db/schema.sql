@@ -20,9 +20,14 @@ CREATE TABLE IF NOT EXISTS users (
     totp_enabled    TINYINT DEFAULT 0,
     display_name    VARCHAR(128),
     bio             TEXT,
+    avatar_url      TEXT,
+    avatar_key      TEXT,
     is_admin        TINYINT DEFAULT 0,
     created_at      BIGINT NOT NULL DEFAULT (UNIX_TIMESTAMP())
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE users ADD COLUMN avatar_url TEXT;
+ALTER TABLE users ADD COLUMN avatar_key TEXT;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth       ON users(oauth_provider, oauth_id);
 CREATE INDEX        IF NOT EXISTS idx_users_email_token ON users(email_token);

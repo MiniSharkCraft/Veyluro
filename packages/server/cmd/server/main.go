@@ -25,6 +25,7 @@ import (
 	"amoon-eclipse/server/internal/moderation"
 	"amoon-eclipse/server/internal/notes"
 	"amoon-eclipse/server/internal/pending"
+	"amoon-eclipse/server/internal/r2"
 	"amoon-eclipse/server/internal/rooms"
 	"amoon-eclipse/server/internal/users"
 	"amoon-eclipse/server/internal/ws"
@@ -79,7 +80,14 @@ func main() {
 	msgsHandler := messages.NewHandler(db, hub)
 	notesHandler := notes.NewHandler(db)
 	friendsHandler := friends.NewHandler(db)
-	usersHandler := users.NewHandler(db, cfg.JWTSecret)
+	r2Client := r2.New(r2.Config{
+		AccountID:       cfg.R2AccountID,
+		AccessKeyID:     cfg.R2AccessKeyID,
+		SecretAccessKey: cfg.R2SecretAccessKey,
+		Bucket:          cfg.R2Bucket,
+		PublicBaseURL:   cfg.R2PublicBaseURL,
+	})
+	usersHandler := users.NewHandler(db, cfg.JWTSecret, r2Client)
 	callsHandler := calls.NewHandler(cfg.CFTurnTokenID, cfg.CFTurnAPIToken)
 	moderationHandler := moderation.NewHandler(db)
 	pendingHandler := pending.NewHandler(db)
@@ -94,6 +102,7 @@ func main() {
 	r.Use(corsMiddleware(cfg.AllowedOrigins))
 	r.Use(middleware.Timeout(30 * time.Second))
 	r.Use(mw.SecurityHeaders)
+	r.Use(avatarIngressLogger)
 	r.Use(mw.MaxBodySize(512 * 1024))
 
 	// Request integrity — validates X-App-Sum, X-Nonce, X-Timestamp, X-Signature
@@ -236,4 +245,24 @@ func corsMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func avatarIngressLogger(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/users/me/avatar" {
+			authState := "missing"
+			if r.Header.Get("Authorization") != "" {
+				authState = "present"
+			}
+			log.Printf("[avatar] ingress method=%s auth=%s contentLength=%d contentType=%q origin=%q ua=%q",
+				r.Method,
+				authState,
+				r.ContentLength,
+				r.Header.Get("Content-Type"),
+				r.Header.Get("Origin"),
+				r.UserAgent(),
+			)
+		}
+		next.ServeHTTP(w, r)
+	})
 }

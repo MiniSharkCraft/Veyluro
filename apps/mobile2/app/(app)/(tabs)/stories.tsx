@@ -4,6 +4,7 @@ import {
   StyleSheet, SafeAreaView, StatusBar, ScrollView,
   Alert, Modal, ActivityIndicator, RefreshControl,
 } from 'react-native'
+import { BookOpenIcon, PlusIcon } from 'phosphor-react-native'
 import { storiesApi, type StoryType } from '../../../src/lib/api'
 import { storage } from '../../../src/lib/storage'
 
@@ -61,7 +62,8 @@ export default function StoriesScreen() {
           <Text style={s.headerTitle}>Stories</Text>
         </View>
         <TouchableOpacity style={s.addBtn} onPress={() => setNewModal(true)} activeOpacity={0.7}>
-          <Text style={s.addBtnTxt}>+ Story</Text>
+          <PlusIcon size={14} color="#818CF8" weight="bold" />
+          <Text style={s.addBtnTxt}>Story</Text>
         </TouchableOpacity>
       </View>
 
@@ -93,7 +95,7 @@ export default function StoriesScreen() {
         ListEmptyComponent={
           !loading ? (
             <View style={s.empty}>
-              <Text style={s.emptyIco}>📖</Text>
+              <BookOpenIcon size={48} color="#374151" weight="duotone" />
               <Text style={s.emptyTxt}>Chưa có story nào</Text>
               <TouchableOpacity style={s.emptyCreateBtn} onPress={() => setNewModal(true)} activeOpacity={0.8}>
                 <Text style={s.emptyCreateBtnTxt}>Tạo story đầu tiên</Text>
@@ -158,7 +160,7 @@ const s = StyleSheet.create({
   header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 },
   headerSub:       { color: '#6366F1', fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
   headerTitle:     { color: '#F1F5F9', fontSize: 24, fontWeight: '800' },
-  addBtn:          { backgroundColor: '#1E1B4B', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8 },
+  addBtn:          { backgroundColor: '#1E1B4B', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
   addBtnTxt:       { color: '#818CF8', fontSize: 13, fontWeight: '700' },
   viewer:          { marginHorizontal: 16, marginBottom: 12 },
   viewerCard:      { backgroundColor: '#12121E', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#1E1B4B' },
@@ -181,7 +183,6 @@ const s = StyleSheet.create({
   rowPreview:      { color: '#64748B', fontSize: 13, marginBottom: 2 },
   rowTime:         { color: '#374151', fontSize: 11 },
   empty:           { alignItems: 'center', paddingTop: 60, paddingHorizontal: 40 },
-  emptyIco:        { fontSize: 48, marginBottom: 12 },
   emptyTxt:        { color: '#4B5563', fontSize: 15, marginBottom: 20 },
   emptyCreateBtn:  { backgroundColor: '#1E1B4B', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },
   emptyCreateBtnTxt:{ color: '#818CF8', fontSize: 14, fontWeight: '700' },

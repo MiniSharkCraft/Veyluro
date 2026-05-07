@@ -1,113 +1,62 @@
 # Privacy Policy
 
-Effective date: May 6, 2026
+Effective date: May 7, 2026
 
-This Privacy Policy explains how AMoon Eclipse handles information in the web, mobile, desktop, and self-hosted versions of the app.
-
-This document is a practical project policy template, not legal advice. If you operate AMoon Eclipse as a public service, review this policy with qualified legal counsel and adapt it to your actual deployment.
+This policy explains how AMoon Eclipse handles data in hosted and self-hosted deployments.
 
 ## 1. Summary
 
-AMoon Eclipse is designed as an end-to-end encrypted messenger. Message plaintext is encrypted on the client before it reaches the server.
+AMoon Eclipse is designed for client-side encryption. Message plaintext is encrypted on your device before it reaches the server.
 
-The server is not designed to read message plaintext. It still processes account information, public keys, encrypted message bundles, metadata, and security logs needed to provide the service.
+The server is not designed to read your message plaintext, but it may process metadata needed to deliver and secure the service.
 
-## 2. Information We Process
+## 2. Data We May Process
 
-Depending on how the service is configured, AMoon Eclipse may process:
+Depending on deployment settings, AMoon Eclipse may process:
 
-- account identifiers, such as user ID and username
-- email address for account recovery or notifications
+- account data such as username, display name, and user ID
+- email address if enabled for recovery or notifications
 - password hashes, not plaintext passwords
-- public encryption keys and fingerprints
-- encrypted private-key backup data, if you enable passphrase recovery
-- encrypted message bundles and attachment references
-- room, group, membership, friend, block, moderation, and pending-message metadata
-- OAuth account identifiers if you use third-party sign-in
-- TOTP configuration status if you enable two-factor authentication
-- IP address, user agent, timestamps, request paths, and security events in server logs
-- crash, diagnostic, or abuse-prevention data if enabled by the deployment
+- public keys and fingerprints
+- encrypted message bundles and attachments
+- room, friend, block, invite, moderation, and pending-message metadata
+- OAuth identifiers if third-party sign-in is enabled
+- TOTP state if two-factor authentication is enabled
+- IP address, user agent, timestamps, request paths, and security logs
 
-## 3. Message Content
+## 3. How Data Is Used
 
-Message plaintext is encrypted on your device using client-side encryption before transmission.
-
-The server stores and forwards encrypted message bundles. Server operators may still see metadata required for delivery, such as sender ID, room ID, recipient membership, timestamps, public keys, and message size.
-
-If you lose your private key or recovery passphrase, encrypted messages may not be recoverable.
-
-## 4. How We Use Information
-
-We use information to:
+Data is used to:
 
 - create and authenticate accounts
 - deliver encrypted messages and realtime events
-- manage rooms, friends, pending requests, blocking, moderation, and profile features
-- provide account recovery and security features
-- prevent spam, abuse, scanning, and attacks
-- debug, maintain, and improve the service
-- comply with legal obligations when required
+- manage profiles, rooms, friends, blocking, and moderation
+- provide recovery and security features
+- detect abuse, scanning, and attacks
+- maintain and improve the service
 
-## 5. Sharing
+## 4. Sharing
 
-We do not sell message content or account data.
+We do not sell your message content or account data.
 
-Information may be shared only when needed for:
+Data may be shared with hosting, database, email, OAuth, TURN, or security providers only when needed to operate the service, or when required by law.
 
-- hosting, database, email, OAuth, TURN, security, or infrastructure providers
-- legal compliance or valid legal process
-- protecting users, the service, or the public from abuse or security threats
-- self-hosted deployments operated by third parties, where that operator controls its own data handling
+## 5. Retention
 
-## 6. Data Retention
+Retention depends on deployment configuration. Typical data is kept only as long as needed for account operation, delivery, debugging, security, or legal obligations.
 
-Retention depends on the deployment configuration.
+## 6. Your Choices
 
-Typical data may be kept as follows:
+Depending on the deployment, you may be able to update profile data, rotate keys, enable or disable 2FA, block users, or request account deletion.
 
-- account data: while the account exists
-- encrypted messages and metadata: while needed for message history and delivery
-- security logs: for a limited period needed for abuse prevention and debugging
-- deleted or expired content: removed according to server configuration and backup limits
+## 7. Security
 
-Backups, logs, and federated or third-party copies may take additional time to expire.
+AMoon Eclipse uses end-to-end encryption, password hashing, rate limits, security headers, and abuse-detection controls. No system is perfectly secure.
 
-## 7. Your Choices
+## 8. Children
 
-Depending on the deployment, you may be able to:
+AMoon Eclipse is not intended for children under 13 or below the minimum age required by local law.
 
-- update your profile information
-- change your password
-- enable or disable two-factor authentication
-- rotate or recreate encryption keys
-- block users
-- delete local app data from your device
-- request account deletion from the service operator
+## 9. Changes
 
-For self-hosted instances, contact the operator of that instance.
-
-## 8. Security
-
-AMoon Eclipse uses technical controls such as end-to-end encryption, password hashing, field-level encryption for selected server-side data, rate limits, security headers, and scanner-abuse detection.
-
-No system is perfectly secure. You should keep your devices updated, protect your credentials, and store recovery passphrases safely.
-
-## 9. Children
-
-AMoon Eclipse is not intended for children under 13 or for users under the minimum age required by local law.
-
-Do not use the service if you are not old enough to consent to these terms in your jurisdiction.
-
-## 10. International Use
-
-If you use or host AMoon Eclipse across regions, your information may be processed in countries where the server, database, or infrastructure providers operate.
-
-Self-hosted operators are responsible for their own regional compliance obligations.
-
-## 11. Changes
-
-We may update this Privacy Policy when the app, service, or data practices change. Continued use after changes means you accept the updated policy.
-
-## 12. Contact
-
-For privacy questions, security concerns, or account requests, contact the maintainers through the GitHub repository or the official contact channel published with your deployment.
+This policy may change when the app or service changes. Continued use means you accept the updated policy.

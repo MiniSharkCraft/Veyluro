@@ -43,54 +43,64 @@ func loadDotEnv(path string) {
 }
 
 type Config struct {
-	Port             string
-	DBDSN            string // MySQL/MariaDB DSN
-	JWTSecret        string
-	DBEncryptionKey  string // 64-char hex = 32 bytes, AES-256-GCM cho PII
-	DBHmacKey        string // 64-char hex = 32 bytes, HMAC-SHA256 email token
-	AllowedOrigins   []string
-	Env              string
-	HMACSigningKey   string   // JS request signing key (matches secureRequest.ts SIG_KEY)
-	ExpectedAppSums  []string // Valid X-App-Sum values for release APK/IPA
-	GoogleClientID     string // Web client ID
-	GoogleClientSecret string // Web client secret
-	GoogleRedirectURI  string // OAuth redirect URI
-	OAuthAppRedirect   string // Deep-link URI về app, vd: amoon-eclipse://auth
-	CFTurnTokenID      string // Cloudflare TURN token ID
-	CFTurnAPIToken     string // Cloudflare TURN API token
-	FacebookAppID    string // App ID để verify token
-	SMTPHost         string // VD: mail.yourdomain.com
-	SMTPPort         string // 587 hoặc 465
-	SMTPUser         string // địa chỉ email đầy đủ
-	SMTPPass         string // mật khẩu email
-	EmailFrom        string // VD: AMoon Eclipse <noreply@yourdomain.com>
+	Port               string
+	DBDSN              string // MySQL/MariaDB DSN
+	JWTSecret          string
+	DBEncryptionKey    string // 64-char hex = 32 bytes, AES-256-GCM cho PII
+	DBHmacKey          string // 64-char hex = 32 bytes, HMAC-SHA256 email token
+	AllowedOrigins     []string
+	Env                string
+	HMACSigningKey     string   // JS request signing key (matches secureRequest.ts SIG_KEY)
+	ExpectedAppSums    []string // Valid X-App-Sum values for release APK/IPA
+	GoogleClientID     string   // Web client ID
+	GoogleClientSecret string   // Web client secret
+	GoogleRedirectURI  string   // OAuth redirect URI
+	OAuthAppRedirect   string   // Deep-link URI về app, vd: amoon-eclipse://auth
+	CFTurnTokenID      string   // Cloudflare TURN token ID
+	CFTurnAPIToken     string   // Cloudflare TURN API token
+	R2AccountID        string   // Cloudflare R2 account ID
+	R2AccessKeyID      string   // Cloudflare R2 S3 access key
+	R2SecretAccessKey  string   // Cloudflare R2 S3 secret
+	R2Bucket           string   // Bucket name
+	R2PublicBaseURL    string   // Public/custom domain base URL for objects
+	FacebookAppID      string   // App ID để verify token
+	SMTPHost           string   // VD: mail.yourdomain.com
+	SMTPPort           string   // 587 hoặc 465
+	SMTPUser           string   // địa chỉ email đầy đủ
+	SMTPPass           string   // mật khẩu email
+	EmailFrom          string   // VD: AMoon Eclipse <noreply@yourdomain.com>
 }
 
 func Load() *Config {
 	loadDotEnv(".env")
 	origins := strings.Split(getEnv("ALLOWED_ORIGINS", "*"), ",")
 	return &Config{
-		Port:            getEnv("PORT", getEnv("P_SERVER_PORT", "8080")),
-		DBDSN:           mustEnv("DB_DSN"),
-		JWTSecret:       mustEnv("JWT_SECRET"),
-		DBEncryptionKey: mustEnv("DB_ENCRYPTION_KEY"),
-		DBHmacKey:       mustEnv("DB_HMAC_KEY"),
-		AllowedOrigins:  origins,
-		Env:             getEnv("ENV", "production"),
-		HMACSigningKey:  getEnv("HMAC_SIGNING_KEY", ""),
-		ExpectedAppSums: splitCSV(getEnv("EXPECTED_APP_SUMS", "")),
-			GoogleClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
-			GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
-			GoogleRedirectURI:  getEnv("GOOGLE_REDIRECT_URI", "http://localhost:8080/api/auth/google/callback"),
-			OAuthAppRedirect:   getEnv("OAUTH_APP_REDIRECT", "amoon-eclipse://auth"),
-			CFTurnTokenID:      getEnv("CF_TURN_TOKEN_ID", ""),
+		Port:               getEnv("PORT", getEnv("P_SERVER_PORT", "8080")),
+		DBDSN:              mustEnv("DB_DSN"),
+		JWTSecret:          mustEnv("JWT_SECRET"),
+		DBEncryptionKey:    mustEnv("DB_ENCRYPTION_KEY"),
+		DBHmacKey:          mustEnv("DB_HMAC_KEY"),
+		AllowedOrigins:     origins,
+		Env:                getEnv("ENV", "production"),
+		HMACSigningKey:     getEnv("HMAC_SIGNING_KEY", ""),
+		ExpectedAppSums:    splitCSV(getEnv("EXPECTED_APP_SUMS", "")),
+		GoogleClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
+		GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
+		GoogleRedirectURI:  getEnv("GOOGLE_REDIRECT_URI", "http://localhost:8080/api/auth/google/callback"),
+		OAuthAppRedirect:   getEnv("OAUTH_APP_REDIRECT", "amoon-eclipse://auth"),
+		CFTurnTokenID:      getEnv("CF_TURN_TOKEN_ID", ""),
 		CFTurnAPIToken:     getEnv("CF_TURN_API_TOKEN", ""),
-		FacebookAppID:   getEnv("FACEBOOK_APP_ID", ""),
-		SMTPHost:        getEnv("SMTP_HOST", ""),
-		SMTPPort:        getEnv("SMTP_PORT", "587"),
-		SMTPUser:        getEnv("SMTP_USER", ""),
-		SMTPPass:        getEnv("SMTP_PASS", ""),
-		EmailFrom:       getEnv("EMAIL_FROM", "AMoon Eclipse <noreply@amoon-eclipse.app>"),
+		R2AccountID:        getEnv("R2_ACCOUNT_ID", ""),
+		R2AccessKeyID:      getEnv("R2_ACCESS_KEY_ID", ""),
+		R2SecretAccessKey:  getEnv("R2_SECRET_ACCESS_KEY", ""),
+		R2Bucket:           getEnv("R2_BUCKET", ""),
+		R2PublicBaseURL:    strings.TrimRight(getEnv("R2_PUBLIC_BASE_URL", ""), "/"),
+		FacebookAppID:      getEnv("FACEBOOK_APP_ID", ""),
+		SMTPHost:           getEnv("SMTP_HOST", ""),
+		SMTPPort:           getEnv("SMTP_PORT", "587"),
+		SMTPUser:           getEnv("SMTP_USER", ""),
+		SMTPPass:           getEnv("SMTP_PASS", ""),
+		EmailFrom:          getEnv("EMAIL_FROM", "AMoon Eclipse <noreply@amoon-eclipse.app>"),
 	}
 }
 
