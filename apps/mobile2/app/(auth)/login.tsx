@@ -1,5 +1,5 @@
 import 'expo-standard-web-crypto'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, Alert,
   KeyboardAvoidingView, Platform, ScrollView,
@@ -98,6 +98,31 @@ export default function LoginScreen() {
   const [focused, setFocused] = useState<string | null>(null)
 
   const isLoading = loading !== null
+
+  useEffect(() => {
+    let alive = true
+
+    async function redirectExistingSession() {
+      try {
+        const [token, userId] = await Promise.all([
+          SecureStore.getItemAsync('amoon_token'),
+          SecureStore.getItemAsync('amoon_userId'),
+        ])
+        if (!alive || !token || !userId) return
+
+        const privateKey = await SecureStore.getItemAsync(`privateKey_${userId}`)
+        if (!alive) return
+        router.replace(privateKey ? '/(app)/(tabs)' : '/(auth)/recover-key')
+      } catch (err) {
+        console.warn('[session] login guard failed:', err)
+      }
+    }
+
+    redirectExistingSession()
+    return () => {
+      alive = false
+    }
+  }, [])
 
   // ── Google OAuth (server-side) ───────────────────────────────────────────
   const handleGoogle = async () => {
