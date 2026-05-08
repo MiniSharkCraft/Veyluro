@@ -39,6 +39,7 @@ func (h *Handler) Routes() chi.Router {
 	r.Get("/search", h.search)
 	r.Get("/me", h.me)
 	r.Patch("/me", h.updateProfile)
+	r.Delete("/me", h.deleteMe)
 	r.Post("/me/avatar", h.uploadAvatar)
 	r.Delete("/me/avatar", h.deleteAvatar)
 	r.Get("/invite-link", h.getOrCreateInviteLink)
@@ -180,6 +181,56 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 		resp["token"] = token
 	}
 	jsonOK(w, resp)
+}
+
+// DELETE /api/users/me
+func (h *Handler) deleteMe(w http.ResponseWriter, r *http.Request) {
+	me := r.Context().Value(auth.ContextKeyUserID).(string)
+
+	tx, err := h.db.BeginTx(r.Context(), nil)
+	if err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback()
+
+	var avatarKey string
+	if err := tx.QueryRowContext(r.Context(), `SELECT COALESCE(avatar_key,'') FROM users WHERE id=?`, me).Scan(&avatarKey); err != nil {
+		if err == sql.ErrNoRows {
+			jsonError(w, "not found", http.StatusNotFound)
+			return
+		}
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	// messages.sender_id has FK without ON DELETE CASCADE, so remove authored messages first.
+	if _, err := tx.ExecContext(r.Context(), `DELETE FROM messages WHERE sender_id=?`, me); err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	res, err := tx.ExecContext(r.Context(), `DELETE FROM users WHERE id=?`, me)
+	if err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	affected, _ := res.RowsAffected()
+	if affected == 0 {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		jsonError(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	if avatarKey != "" && h.r2 != nil {
+		go h.r2.DeleteObject(context.Background(), avatarKey)
+	}
+
+	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
 // POST /api/users/me/avatar — multipart field "avatar" hoặc "file", max 25MB.

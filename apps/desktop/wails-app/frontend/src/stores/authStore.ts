@@ -24,6 +24,7 @@ interface AuthState {
   completeOAuthLogin: (payload: { userId: string; username: string; token: string }, passphrase?: string) => Promise<void>
   logout:          () => void
   setSession:      (userId: string, username: string, token: string, privKey: CryptoKey, pubKey: string) => void
+  restoreSession:  () => Promise<void>
 }
 
 // ─── IndexedDB ────────────────────────────────────────────────────────────────
@@ -38,6 +39,30 @@ export const savePrivateKey = async (userId: string, pkcs8: string) =>
 export const loadPrivateKey = async (userId: string): Promise<CryptoKey | null> => {
   const raw = await (await getDb()).get('keys', `pk:${userId}`)
   return raw ? importRsaPrivateKey(raw) : null
+}
+
+const SESSION_KEYS = ['amoon:userId', 'amoon:token', 'amoon:username', 'amoon:pubKey']
+
+function saveSession(userId: string, username: string, token: string, pubKey: string) {
+  localStorage.setItem('amoon:userId', userId)
+  localStorage.setItem('amoon:token', token)
+  localStorage.setItem('amoon:username', username)
+  localStorage.setItem('amoon:pubKey', pubKey)
+}
+
+function migrateSessionStorage() {
+  for (const key of SESSION_KEYS) {
+    const existing = localStorage.getItem(key)
+    const legacy = sessionStorage.getItem(key)
+    if (!existing && legacy) localStorage.setItem(key, legacy)
+  }
+}
+
+function clearSession() {
+  for (const key of SESSION_KEYS) {
+    localStorage.removeItem(key)
+    sessionStorage.removeItem(key)
+  }
 }
 
 // ─── E2EE key setup (generate + register + backup passphrase) ─────────────────
@@ -74,10 +99,24 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   setSession: (userId, username, token, privKey, pubKey) => {
     set({ isAuthenticated: true, userId, username, token, privateKey: privKey, publicKey: pubKey, needsKeyRecovery: false })
-    sessionStorage.setItem('amoon:userId',   userId)
-    sessionStorage.setItem('amoon:token',    token)
-    sessionStorage.setItem('amoon:username', username)
-    sessionStorage.setItem('amoon:pubKey',   pubKey)
+    saveSession(userId, username, token, pubKey)
+  },
+
+  restoreSession: async () => {
+    migrateSessionStorage()
+    const userId = localStorage.getItem('amoon:userId')
+    const token = localStorage.getItem('amoon:token')
+    const username = localStorage.getItem('amoon:username')
+    const pubKey = localStorage.getItem('amoon:pubKey') ?? ''
+    if (!userId || !token || !username) return
+
+    const privKey = await loadPrivateKey(userId)
+    if (!privKey) {
+      set({ isAuthenticated: false, needsKeyRecovery: true, userId, token, username, publicKey: pubKey || null, privateKey: null })
+      return
+    }
+
+    set({ isAuthenticated: true, userId, username, token, publicKey: pubKey || null, privateKey: privKey, needsKeyRecovery: false })
   },
 
   register: async (username, email, password, passphrase) => {
@@ -95,10 +134,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     const created = await setupE2eeKey(userId, data.token, passphrase)
     const privKey = await importRsaPrivateKey(created.privateKey)
     set({ isAuthenticated: true, userId, username, publicKey: created.publicKey, privateKey: privKey, token: data.token, needsKeyRecovery: false })
-    sessionStorage.setItem('amoon:userId',   userId)
-    sessionStorage.setItem('amoon:token',    data.token ?? '')
-    sessionStorage.setItem('amoon:username', username)
-    sessionStorage.setItem('amoon:pubKey',   created.publicKey)
+    saveSession(userId, username, data.token ?? '', created.publicKey)
   },
 
   login: async (username, password) => {
@@ -117,18 +153,13 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     const privKey = await loadPrivateKey(uid)
     if (!privKey) {
-      sessionStorage.setItem('amoon:userId',   uid)
-      sessionStorage.setItem('amoon:token',    data.token)
-      sessionStorage.setItem('amoon:username', uname)
+      saveSession(uid, uname, data.token, pubKey)
       set({ needsKeyRecovery: true, userId: uid, token: data.token, username: uname })
       return
     }
 
     set({ isAuthenticated: true, userId: uid, username: uname, publicKey: pubKey, privateKey: privKey, token: data.token, needsKeyRecovery: false })
-    sessionStorage.setItem('amoon:userId',   uid)
-    sessionStorage.setItem('amoon:token',    data.token)
-    sessionStorage.setItem('amoon:username', uname)
-    sessionStorage.setItem('amoon:pubKey',   pubKey)
+    saveSession(uid, uname, data.token, pubKey)
   },
 
   loginWithOAuth: async (accessToken, passphrase) => {
@@ -152,15 +183,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
 
     set({ isAuthenticated: true, userId: data.userId, username: data.username, publicKey: pubKey ?? null, privateKey: privKey, token: data.token, needsKeyRecovery: false })
-    sessionStorage.setItem('amoon:userId',   data.userId)
-    sessionStorage.setItem('amoon:token',    data.token)
-    sessionStorage.setItem('amoon:username', data.username)
-    sessionStorage.setItem('amoon:pubKey',   pubKey ?? '')
+    saveSession(data.userId, data.username, data.token, pubKey ?? '')
   },
 
   completeOAuthLogin: async (payload, passphrase) => {
     let privKey = await loadPrivateKey(payload.userId)
-    let pubKey = sessionStorage.getItem('amoon:pubKey') ?? undefined
+    let pubKey = localStorage.getItem('amoon:pubKey') ?? sessionStorage.getItem('amoon:pubKey') ?? undefined
 
     if (!privKey) {
       const created = await setupE2eeKey(payload.userId, payload.token, passphrase)
@@ -177,14 +205,11 @@ export const useAuthStore = create<AuthState>((set) => ({
       token: payload.token,
       needsKeyRecovery: false,
     })
-    sessionStorage.setItem('amoon:userId', payload.userId)
-    sessionStorage.setItem('amoon:token', payload.token)
-    sessionStorage.setItem('amoon:username', payload.username)
-    sessionStorage.setItem('amoon:pubKey', pubKey ?? '')
+    saveSession(payload.userId, payload.username, payload.token, pubKey ?? '')
   },
 
   logout: () => {
     set({ isAuthenticated: false, userId: null, username: null, publicKey: null, privateKey: null, token: null, needsKeyRecovery: false })
-    ;['amoon:userId','amoon:token','amoon:username','amoon:pubKey'].forEach(k => sessionStorage.removeItem(k))
+    clearSession()
   },
 }))

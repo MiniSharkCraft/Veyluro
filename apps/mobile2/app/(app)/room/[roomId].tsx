@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
-  KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet,
-  StatusBar, ActivityIndicator, Modal, Alert, Image,
+  KeyboardAvoidingView, Platform, StyleSheet,
+  StatusBar, ActivityIndicator, Modal, Alert, Image, useWindowDimensions,
 } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { useLocalSearchParams, router } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   ArrowLeftIcon,
   DotsThreeVerticalIcon,
@@ -32,6 +33,8 @@ const avatarBg = (name: string) => COLORS[(name?.charCodeAt(0) ?? 0) % COLORS.le
 
 export default function RoomScreen() {
   const { roomId } = useLocalSearchParams<{ roomId: string }>()
+  const insets = useSafeAreaInsets()
+  const { width } = useWindowDimensions()
   const { messages, members, connected, loading, sendMessage, sendImage, wsRef } = useChat(roomId)
   const [input, setInput] = useState('')
   const [inputH, setInputH] = useState(44)
@@ -206,13 +209,14 @@ export default function RoomScreen() {
   const displayTitle = roomType === 'group'
     ? (roomName || 'Nhóm chat')
     : (otherMember?.username ? `@${otherMember.username}` : 'Chat')
+  const imageSize = Math.min(280, Math.floor(width * 0.62))
 
   return (
-    <SafeAreaView style={s.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#0E0E1C" />
+    <View style={s.root}>
+      <StatusBar barStyle="light-content" backgroundColor="#0E0E1C" translucent={false} />
 
       {/* Header */}
-      <View style={s.header}>
+      <View style={[s.header, { paddingTop: Math.max(insets.top, 8) + 6 }]}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
           <ArrowLeftIcon size={24} color="#818CF8" weight="bold" />
         </TouchableOpacity>
@@ -411,7 +415,7 @@ export default function RoomScreen() {
       </Modal>
 
       {/* Messages */}
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {loading ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator color="#6366F1" size="large" />
@@ -441,7 +445,7 @@ export default function RoomScreen() {
                       <Text style={s.msgAvatarTxt}>{senderName[0]?.toUpperCase()}</Text>
                     </View>
                   )}
-                  <View>
+                  <View style={[s.msgBlock, item.mine ? s.msgBlockMine : s.msgBlockTheirs]}>
                     {!item.mine && !grouped && roomType === 'group' && (
                       <Text style={s.senderName}>@{senderName}</Text>
                     )}
@@ -449,7 +453,7 @@ export default function RoomScreen() {
                       {item.attachment?.kind === 'image' && (
                         <Image
                           source={{ uri: item.attachment.localUri || item.attachment.thumbUrl || item.attachment.url }}
-                          style={s.bubbleImage}
+                          style={[s.bubbleImage, { width: imageSize, height: imageSize }]}
                           resizeMode="cover"
                         />
                       )}
@@ -470,7 +474,7 @@ export default function RoomScreen() {
           />
         )}
 
-        <View style={s.bar}>
+        <View style={[s.bar, { paddingBottom: Math.max(insets.bottom, 8) + 8 }]}>
           <TouchableOpacity
             style={[s.imageBtn, imageSending && { opacity: 0.5 }]}
             onPress={pickImage}
@@ -501,7 +505,7 @@ export default function RoomScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   )
 }
 
@@ -585,19 +589,22 @@ const s = StyleSheet.create({
   msgRow:      { flexDirection: 'row', alignItems: 'flex-end', marginTop: 8 },
   msgLeft:     { justifyContent: 'flex-start' },
   msgRight:    { justifyContent: 'flex-end' },
+  msgBlock:    { maxWidth: '78%' },
+  msgBlockMine:{ alignItems: 'flex-end' },
+  msgBlockTheirs:{ alignItems: 'flex-start' },
   msgAvatar:   { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
   msgAvatarTxt:{ color: '#fff', fontSize: 11, fontWeight: '700' },
-  bubble:      { maxWidth: '76%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
+  bubble:      { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
   imageBubble: { padding: 4, overflow: 'hidden' },
   bubbleMine:  { backgroundColor: '#3730A3', borderBottomRightRadius: 4 },
   bubbleTheirs:{ backgroundColor: '#1A1A2E', borderBottomLeftRadius: 4 },
-  bubbleImage: { width: 220, height: 220, borderRadius: 15, backgroundColor: '#050508' },
+  bubbleImage: { borderRadius: 15, backgroundColor: '#050508' },
   bubbleTxt:   { color: '#F1F5F9', fontSize: 15, lineHeight: 22 },
   meta:        { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 4 },
   metaTime:    { color: 'rgba(241,245,249,0.35)', fontSize: 11 },
   metaTick:    { color: 'rgba(241,245,249,0.35)', fontSize: 11 },
   metaTickRead:{ color: '#818CF8' },
-  bar:         { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 10, paddingBottom: Platform.OS === 'ios' ? 24 : 10, backgroundColor: '#0E0E1C', borderTopWidth: 1, borderTopColor: '#12121E' },
+  bar:         { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingTop: 10, backgroundColor: '#0E0E1C', borderTopWidth: 1, borderTopColor: '#12121E' },
   imageBtn:    { width: 40, height: 40, borderRadius: 20, backgroundColor: '#12121E', alignItems: 'center', justifyContent: 'center', marginRight: 8 },
   input:       { flex: 1, backgroundColor: '#12121E', borderRadius: 22, paddingHorizontal: 16, paddingTop: 11, paddingBottom: 11, color: '#F1F5F9', fontSize: 15, marginRight: 8 },
   sendBtn:     { width: 40, height: 40, borderRadius: 20, backgroundColor: '#12121E', alignItems: 'center', justifyContent: 'center' },

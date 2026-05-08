@@ -267,6 +267,7 @@ export const usersApi = {
     return parsed
   },
   deleteAvatar: () => request<{ status: string }>('/api/users/me/avatar', { method: 'DELETE' }),
+  deleteAccount: () => request<{ status: string }>('/api/users/me', { method: 'DELETE' }),
   inviteLink: () => request<{ token: string; link: string }>('/api/users/invite-link'),
   resolveInvite: (token: string) => request<{ userId: string; username: string }>(`/api/users/invite/${token}`),
   totpSetup: () => request<{ secret: string; url: string }>('/api/users/totp/setup', { method: 'POST' }),

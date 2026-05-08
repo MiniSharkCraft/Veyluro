@@ -232,6 +232,42 @@ export default function SettingsScreen() {
     ])
   }
 
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Xóa tài khoản?',
+      'Thao tác này không thể hoàn tác. Tài khoản và dữ liệu liên quan sẽ bị xóa.',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xóa tài khoản',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Xác nhận lần cuối',
+              'Bạn chắc chắn muốn xóa vĩnh viễn tài khoản này?',
+              [
+                { text: 'Hủy', style: 'cancel' },
+                {
+                  text: 'Xóa vĩnh viễn',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await usersApi.deleteAccount()
+                      await storage.clear()
+                      router.replace('/(auth)/login')
+                    } catch (e: unknown) {
+                      Alert.alert('Lỗi', e instanceof Error ? e.message : 'Không xóa được tài khoản')
+                    }
+                  },
+                },
+              ]
+            )
+          },
+        },
+      ]
+    )
+  }
+
   if (loading) return (
     <SafeAreaView style={s.root}>
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -369,6 +405,11 @@ export default function SettingsScreen() {
           <TouchableOpacity style={s.logoutRow} onPress={handleLogout} activeOpacity={0.7}>
             <SignOutIcon size={20} color="#EF4444" weight="bold" style={s.logoutIco} />
             <Text style={s.logoutTxt}>Đăng xuất</Text>
+          </TouchableOpacity>
+          <View style={s.rowDivider} />
+          <TouchableOpacity style={s.logoutRow} onPress={handleDeleteAccount} activeOpacity={0.7}>
+            <TrashIcon size={20} color="#EF4444" weight="bold" style={s.logoutIco} />
+            <Text style={s.logoutTxt}>Xóa tài khoản</Text>
           </TouchableOpacity>
         </View>
 
@@ -579,6 +620,7 @@ const s = StyleSheet.create({
   inviteActionBtn:{ flex: 1, backgroundColor: '#12121E', borderRadius: 10, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: '#1E1E30' },
   inviteActionTxt:{ color: '#94A3B8', fontSize: 13, fontWeight: '600' },
   logoutRow:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 15 },
+  rowDivider:     { height: 1, backgroundColor: '#12121E', marginHorizontal: 16 },
   logoutIco:      { marginRight: 12, width: 26 },
   logoutTxt:      { color: '#EF4444', fontSize: 15, fontWeight: '600' },
   versionTxt:     { color: '#1E1E30', fontSize: 11, textAlign: 'center', marginTop: 28 },

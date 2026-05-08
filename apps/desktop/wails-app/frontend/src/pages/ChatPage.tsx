@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
+  Camera,
   ChatCircle,
   CircleDashed,
   GearSix,
+  ImageSquare,
   LockSimple,
   MagnifyingGlass,
   Note,
@@ -12,6 +14,7 @@ import {
   Plus,
   ShieldStar,
   SignOut,
+  Trash,
   Tray,
   UsersThree,
 } from '@phosphor-icons/react'
@@ -20,24 +23,35 @@ import { encryptMessage, decryptMessage, encryptPrivateKeyWithPassphrase } from 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Room      { id: string; name: string; type: 'dm'|'group'; groupAdminId?: string; memberCount?: number; lastMessageAt?: number }
-interface Member    { id: string; username: string; publicKey: string; fingerprint: string }
-interface Message   { id: string; senderId: string; bundle: string; createdAt: number; text?: string }
-interface Friend    { id: string; username: string; publicKey: string; friendId: string }
-interface FriendReq { id: string; fromId: string; username: string; publicKey: string }
+interface AvatarFields { avatarUrl?: string; avatarThumbUrl?: string }
+interface Member    extends AvatarFields { id: string; username: string; publicKey: string; fingerprint: string }
+interface Attachment { kind: 'image'; url: string; thumbUrl?: string; key: string; mime: string; size: number; name?: string; localUri?: string }
+interface Message   { id: string; senderId: string; bundle: string; createdAt: number; text?: string; attachment?: Attachment; pending?: boolean }
+interface Friend    extends AvatarFields { id: string; username: string; publicKey: string; friendId: string }
+interface FriendReq extends AvatarFields { id: string; fromId: string; username: string; publicKey: string }
 interface Story     { id: string; userId: string; content: string; expiresAt: number; createdAt: number }
 interface PendingMsg{ id: string; fromUserId: string; fromUsername: string; bundle: string; createdAt: number; text?: string }
-interface Profile   { id: string; username: string; displayName?: string; bio?: string; publicKey?: string; totpEnabled: boolean; isAdmin: boolean }
-interface BlockedUser { id: string; username: string; createdAt: number }
+interface Profile   extends AvatarFields { id: string; username: string; displayName?: string; bio?: string; publicKey?: string; totpEnabled: boolean; isAdmin: boolean }
+interface BlockedUser extends AvatarFields { id: string; username: string; createdAt: number }
 interface Report    { id: string; reason: string; detail?: string; status: string; adminNote?: string; createdAt: number; reporterUsername: string; reportedUsername: string; reportedId: string }
 interface Note      { id: string; text: string; updatedAt: number }
-interface SearchUser{ id: string; username: string; publicKey?: string }
+interface SearchUser extends AvatarFields { id: string; username: string; publicKey?: string }
 
 type Tab = 'chats' | 'friends' | 'pending' | 'stories' | 'notes' | 'calls' | 'settings' | 'admin'
 
 // ─── Avatar helper ────────────────────────────────────────────────────────────
 const AVATAR_COLORS = ['#6366f1','#8b5cf6','#ec4899','#06b6d4','#10b981','#f59e0b','#ef4444']
 function avatarColor(name: string) { return AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length] }
-function Avatar({ name, size = 36 }: { name: string; size?: number }) {
+function Avatar({ name, size = 36, src }: { name: string; size?: number; src?: string }) {
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt=""
+        style={{ width: size, height: size, minWidth: size, borderRadius: size / 2, objectFit: 'cover', background: avatarColor(name) }}
+      />
+    )
+  }
   return (
     <div style={{ width: size, height: size, minWidth: size, borderRadius: size/2, background: avatarColor(name), display:'flex', alignItems:'center', justifyContent:'center', fontSize: size * 0.38, fontWeight: 700, color: '#fff', userSelect: 'none' }}>
       {name[0]?.toUpperCase()}
@@ -56,6 +70,26 @@ function EmptyState({ icon, text, sub }: { icon: string; text: string; sub?: str
 }
 
 function authHdr(token: string) { return { Authorization: `Bearer ${token}` } }
+
+const MAX_IMAGE_BYTES = 50 * 1024 * 1024
+
+function parseMessageText(text: string): { text: string; attachment?: Attachment } {
+  try {
+    const data = JSON.parse(text)
+    if (data?.amoonType === 'image' && data.attachment?.url) {
+      return { text: data.text ?? '', attachment: data.attachment }
+    }
+  } catch {
+    // Plain text message.
+  }
+  return { text }
+}
+
+function displaySize(bytes: number) {
+  if (!Number.isFinite(bytes)) return ''
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`
+}
 
 // ─── Main ChatPage ────────────────────────────────────────────────────────────
 export function ChatPage() {
@@ -99,7 +133,7 @@ export function ChatPage() {
         ))}
         <div className="flex-1" />
         <button title={username ?? ''} className="w-10 h-10 rounded-xl overflow-hidden mb-1">
-          <Avatar name={username ?? '?'} size={40} />
+          <Avatar name={profile?.displayName || username || '?'} size={40} src={profile?.avatarThumbUrl || profile?.avatarUrl} />
         </button>
         <button title="Sign out" onClick={logout}
           className="w-10 h-10 rounded-xl flex items-center justify-center text-[var(--app-text-faint)] hover:text-red-400 hover:bg-red-500/10 transition-all">
@@ -114,7 +148,7 @@ export function ChatPage() {
       {tab === 'stories'  && <StoriesTab userId={userId!} username={username!} hdr={hdr} />}
       {tab === 'notes'    && <NotesTab />}
       {tab === 'calls'    && <CallsTab userId={userId!} username={username!} token={token!} hdr={hdr} />}
-      {tab === 'settings' && <SettingsTab userId={userId!} token={token!} hdr={hdr} />}
+      {tab === 'settings' && <SettingsTab userId={userId!} token={token!} hdr={hdr} onProfileChange={setProfile} />}
       {tab === 'admin'    && <AdminTab hdr={hdr} />}
     </div>
   )
@@ -134,6 +168,7 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr, onOpenN
   const [search,   setSearch]   = useState('')
   const [results,  setResults]  = useState<SearchUser[]>([])
   const [sending,  setSending]  = useState(false)
+  const [sendingImage, setSendingImage] = useState(false)
   const [sendErr,  setSendErr]  = useState('')
   const [showNew,  setShowNew]  = useState(false)
   // Group creation
@@ -143,6 +178,7 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr, onOpenN
   const bottomRef = useRef<HTMLDivElement>(null)
   const wsRef     = useRef<WebSocket | null>(null)
   const inputRef  = useRef<HTMLInputElement>(null)
+  const fileRef   = useRef<HTMLInputElement>(null)
 
   const fetchRooms = useCallback(async () => {
     const res = await fetch(`${API}/api/rooms`, { headers: hdr })
@@ -172,7 +208,9 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr, onOpenN
       const msg: Message = { id: raw.id, senderId: raw.senderId, bundle: raw.bundle, createdAt: raw.createdAt }
       try {
         const bundle = JSON.parse(raw.bundle)
-        msg.text = await decryptMessage(bundle, userId, privateKey)
+        const parsed = parseMessageText(await decryptMessage(bundle, userId, privateKey))
+        msg.text = parsed.text
+        msg.attachment = parsed.attachment
       } catch (err) { console.warn('[decrypt] WS message failed:', err); msg.text = '[encrypted]' }
       setMessages(prev => {
         if (prev.find(m => m.id === msg.id)) return prev
@@ -196,7 +234,9 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr, onOpenN
     const decrypted = await Promise.all(raw.map(async m => {
       try {
         const bundle = JSON.parse(m.bundle)
-        m.text = await decryptMessage(bundle, userId, privateKey)
+        const parsed = parseMessageText(await decryptMessage(bundle, userId, privateKey))
+        m.text = parsed.text
+        m.attachment = parsed.attachment
       } catch (err) { console.warn('[decrypt] message', m.id, 'failed:', err); m.text = '[encrypted]' }
       return m
     }))
@@ -261,6 +301,96 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr, onOpenN
     } catch (err) {
       setSendErr(err instanceof Error ? err.message : 'Send failed')
     } finally { setSending(false) }
+  }
+
+  const loadRecipients = async () => {
+    if (!active) throw new Error('No active room')
+    let currentMembers = members
+    if (currentMembers.length === 0) {
+      const mRes = await fetch(`${API}/api/rooms/${active.id}/members`, { headers: hdr })
+      if (mRes.ok) { currentMembers = await mRes.json(); setMembers(currentMembers) }
+    }
+    const selfMember = currentMembers.find(m => m.id === userId)
+    const myPublicKey = publicKey || selfMember?.publicKey || ''
+    if (!myPublicKey) throw new Error('Key not loaded yet, please wait a moment')
+
+    const recipients: Array<{id:string;publicKey:string}> = [{ id: userId, publicKey: myPublicKey }]
+    currentMembers
+      .filter(m => m.id !== userId && m.publicKey)
+      .forEach(m => recipients.push({ id: m.id, publicKey: m.publicKey }))
+    if (recipients.length < 2) throw new Error('Cannot find recipient keys')
+    return recipients
+  }
+
+  const uploadImage = async (file: File): Promise<Attachment> => {
+    if (!active) throw new Error('No active room')
+    if (!file.type.startsWith('image/')) throw new Error('Only image files are supported')
+    if (file.size > MAX_IMAGE_BYTES) throw new Error('Image must be 50MB or smaller')
+    const form = new FormData()
+    form.append('image', file, file.name)
+    const res = await fetch(`${API}/api/messages/${active.id}/attachments`, {
+      method: 'POST',
+      headers: hdr,
+      body: form,
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => null)
+      throw new Error(data?.error ?? 'Upload image failed')
+    }
+    return res.json()
+  }
+
+  const sendImage = async (file: File) => {
+    if (!active || sendingImage) return
+    setSendingImage(true)
+    setSendErr('')
+    const localUri = URL.createObjectURL(file)
+    const tempId = `image_${Date.now()}`
+    const tempMessage: Message = {
+      id: tempId,
+      senderId: userId,
+      bundle: '',
+      createdAt: Math.floor(Date.now() / 1000),
+      text: '',
+      attachment: {
+        kind: 'image',
+        url: localUri,
+        thumbUrl: localUri,
+        localUri,
+        key: '',
+        mime: file.type || 'image/jpeg',
+        size: file.size,
+        name: file.name,
+      },
+      pending: true,
+    }
+    setMessages(prev => [...prev, tempMessage])
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+
+    try {
+      const recipients = await loadRecipients()
+      const attachment = await uploadImage(file)
+      const payload = JSON.stringify({ amoonType: 'image', text: '', attachment })
+      const bundle = await encryptMessage(payload, recipients)
+      const res = await fetch(`${API}/api/messages/${active.id}`, {
+        method: 'POST',
+        headers: { ...hdr, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bundle: JSON.stringify(bundle) }),
+      })
+      if (!res.ok) throw new Error('Failed to send image')
+      const data = await res.json().catch(() => null)
+      setMessages(prev => prev.map(m => m.id === tempId
+        ? { ...m, id: data?.id ?? tempId, attachment, pending: false, createdAt: Math.floor(Date.now() / 1000) }
+        : m
+      ))
+    } catch (err) {
+      setSendErr(err instanceof Error ? err.message : 'Image send failed')
+      setMessages(prev => prev.filter(m => m.id !== tempId))
+    } finally {
+      URL.revokeObjectURL(localUri)
+      setSendingImage(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
   }
 
   const roomDisplayName = (r: Room) => {
@@ -335,7 +465,7 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr, onOpenN
             {results.map(u => (
               <button key={u.id} onClick={() => startDM(u)}
                 className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--app-panel-2)] transition-colors">
-                <Avatar name={u.username} />
+                <Avatar name={u.username} src={u.avatarThumbUrl || u.avatarUrl} />
                 <span className="text-sm text-[var(--app-text)]">@{u.username}</span>
               </button>
             ))}
@@ -430,7 +560,7 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr, onOpenN
               </div>
               {active.type === 'group' && (
                 <div className="flex items-center gap-1">
-                  {members.slice(0, 4).map(m => <Avatar key={m.id} name={m.username} size={22} />)}
+                  {members.slice(0, 4).map(m => <Avatar key={m.id} name={m.username} size={22} src={m.avatarThumbUrl || m.avatarUrl} />)}
                 </div>
               )}
             </header>
@@ -441,17 +571,34 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr, onOpenN
                 const sender = members.find(mb => mb.id === m.senderId)
                 return (
                   <div key={m.id} className={`flex items-end gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
-                    {!mine && <Avatar name={sender?.username ?? m.senderId.slice(0,6)} size={28} />}
+                    {!mine && <Avatar name={sender?.username ?? m.senderId.slice(0,6)} size={28} src={sender?.avatarThumbUrl || sender?.avatarUrl} />}
                     <div className={`max-w-[65%] ${mine ? 'items-end' : 'items-start'} flex flex-col gap-0.5`}>
                       {!mine && active.type === 'group' && (
                         <p className="text-[10px] text-[var(--app-text-faint)] px-1">{sender?.username ?? '?'}</p>
                       )}
-                      <div className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                      <div className={`rounded-2xl ${m.attachment ? 'p-1.5' : 'px-4 py-2.5'} text-sm leading-relaxed ${
                         mine
                           ? 'bg-indigo-500/20 border border-indigo-500/30 text-[var(--app-text)] rounded-br-sm'
                           : 'bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] text-[var(--app-text)] rounded-bl-sm'
                       }`}>
-                        {m.text ?? '[encrypted]'}
+                        {m.attachment ? (
+                          <div className="space-y-2">
+                            <a href={m.attachment.url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl bg-black/10">
+                              <img
+                                src={m.attachment.localUri ?? m.attachment.thumbUrl ?? m.attachment.url}
+                                alt={m.attachment.name ?? 'Image attachment'}
+                                className="block max-h-[360px] max-w-[420px] object-cover"
+                              />
+                            </a>
+                            <div className="px-2 pb-1 flex items-center justify-between gap-3 text-[11px] text-[var(--app-text-faint)]">
+                              <span className="truncate">{m.attachment.name ?? 'Image'}</span>
+                              <span className="shrink-0">{m.pending ? 'Uploading...' : displaySize(m.attachment.size)}</span>
+                            </div>
+                            {m.text ? <p className="px-2 pb-1">{m.text}</p> : null}
+                          </div>
+                        ) : (
+                          m.text ?? '[encrypted]'
+                        )}
                       </div>
                       <p className="text-[10px] text-[var(--app-text-faint)] px-1">{fmt(m.createdAt)}</p>
                     </div>
@@ -465,9 +612,25 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr, onOpenN
               <p className="text-red-400 text-xs px-4 py-1 bg-red-950/20 border-t border-red-900/30">{sendErr}</p>
             )}
             <form onSubmit={sendMessage} className="flex items-center gap-3 px-4 py-3 border-t border-[var(--app-border-soft)] bg-[var(--app-bg)] shrink-0">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif"
+                className="hidden"
+                onChange={e => {
+                  const file = e.target.files?.[0]
+                  if (file) void sendImage(file)
+                }}
+              />
+              <button type="button" disabled={sendingImage || sending}
+                onClick={() => fileRef.current?.click()}
+                className="w-11 h-11 rounded-full bg-[var(--app-panel)] text-[var(--app-text-faint)] flex items-center justify-center hover:bg-[var(--app-brand-soft)] hover:text-[var(--app-brand)] transition-all disabled:opacity-30"
+                title="Send image">
+                <ImageSquare size={21} weight="bold" />
+              </button>
               <input ref={inputRef}
                 className="flex-1 bg-[var(--app-panel)] border border-transparent rounded-full px-4 py-3 text-sm text-[var(--app-text)] placeholder:text-[var(--app-text-faint)] focus:outline-none focus:border-[var(--app-brand)]/40 transition-colors"
-                placeholder="Write a message..." value={input} onChange={e => { setInput(e.target.value); if (sendErr) setSendErr('') }} disabled={sending} />
+                placeholder={sendingImage ? 'Uploading image...' : 'Write a message...'} value={input} onChange={e => { setInput(e.target.value); if (sendErr) setSendErr('') }} disabled={sending} />
               <button type="submit" disabled={sending || !input.trim()}
                 className="w-11 h-11 rounded-full bg-[var(--app-brand-soft)] text-[var(--app-brand)] flex items-center justify-center hover:scale-105 transition-all disabled:opacity-30">
                 <PaperPlaneTilt size={20} weight="fill" />
@@ -556,7 +719,7 @@ function FriendsTab({ userId: _userId, username: _username, token, hdr }: { user
               ? <EmptyState icon="👥" text="No friends yet" sub="Use the Find tab to add people" />
               : friends.map(f => (
                 <div key={f.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--app-panel-2)] transition-colors group">
-                  <Avatar name={f.username} />
+                  <Avatar name={f.username} src={f.avatarThumbUrl || f.avatarUrl} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-[var(--app-text)] truncate">{f.username}</p>
                     <p className="text-xs text-green-400">Friend</p>
@@ -570,7 +733,7 @@ function FriendsTab({ userId: _userId, username: _username, token, hdr }: { user
               ? <EmptyState icon="📬" text="No pending requests" />
               : requests.map(req => (
                 <div key={req.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--app-panel-2)] transition-colors">
-                  <Avatar name={req.username} />
+                  <Avatar name={req.username} src={req.avatarThumbUrl || req.avatarUrl} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-[var(--app-text)] truncate">{req.username}</p>
                     <p className="text-xs text-[var(--app-text-faint)]">Wants to be friends</p>
@@ -589,7 +752,7 @@ function FriendsTab({ userId: _userId, username: _username, token, hdr }: { user
               {info && <p className="text-xs text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 rounded-lg px-3 py-2">{info}</p>}
               {results.map(u => (
                 <div key={u.id} className="flex items-center gap-3 bg-[var(--app-panel-2)] rounded-xl p-3">
-                  <Avatar name={u.username} />
+                  <Avatar name={u.username} src={u.avatarThumbUrl || u.avatarUrl} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-[var(--app-text)]">{u.username}</p>
                   </div>
@@ -713,7 +876,7 @@ function PendingTab({ userId, token, privateKey, publicKey, hdr }: {
           {sendRes && (
             <div className="space-y-1.5">
               <div className="flex items-center gap-2 bg-[var(--app-panel-2)] rounded-lg px-2 py-1.5">
-                <Avatar name={sendRes.username} size={22} />
+                <Avatar name={sendRes.username} size={22} src={sendRes.avatarThumbUrl || sendRes.avatarUrl} />
                 <p className="text-xs text-[var(--app-text)]">{sendRes.username}</p>
               </div>
               <textarea className="w-full bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] rounded-lg px-2.5 py-1.5 text-xs text-[var(--app-text)] placeholder:text-[var(--app-text-faint)] focus:outline-none focus:border-indigo-500/50 resize-none"
@@ -958,14 +1121,21 @@ function NotesTab() {
 }
 
 // ─── SETTINGS TAB ─────────────────────────────────────────────────────────────
-function SettingsTab({ userId, token, hdr }: { userId: string; token: string; hdr: Record<string, string> }) {
+function SettingsTab({ userId, token, hdr, onProfileChange }: {
+  userId: string
+  token: string
+  hdr: Record<string, string>
+  onProfileChange?: (profile: Profile) => void
+}) {
   const { logout } = useAuthStore()
   const [sub,         setSub]         = useState<'profile'|'security'|'blocks'|'passphrase'>('profile')
   const [profile,     setProfile]     = useState<Profile | null>(null)
   const [displayName, setDisplayName] = useState('')
   const [bio,         setBio]         = useState('')
   const [saving,      setSaving]      = useState(false)
+  const [avatarSaving,setAvatarSaving]= useState(false)
   const [info,        setInfo]        = useState('')
+  const avatarInputRef = useRef<HTMLInputElement>(null)
   // TOTP
   const [totpSecret,  setTotpSecret]  = useState('')
   const [totpUrl,     setTotpUrl]     = useState('')
@@ -981,6 +1151,7 @@ function SettingsTab({ userId, token, hdr }: { userId: string; token: string; hd
     fetch(`${API}/api/users/me`, { headers: hdr }).then(r => r.ok ? r.json() : null).then(d => {
       if (!d) return
       setProfile(d); setDisplayName(d.displayName ?? ''); setBio(d.bio ?? '')
+      onProfileChange?.(d)
     })
     fetch(`${API}/api/blocks`, { headers: hdr }).then(r => r.ok ? r.json() : []).then(setBlocks)
   }, [token])
@@ -988,8 +1159,65 @@ function SettingsTab({ userId, token, hdr }: { userId: string; token: string; hd
   const saveProfile = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true)
     const res = await fetch(`${API}/api/users/me`, { method: 'PATCH', headers: { ...hdr, 'Content-Type': 'application/json' }, body: JSON.stringify({ displayName, bio }) })
+    if (res.ok) {
+      setProfile(p => {
+        if (!p) return p
+        const next = { ...p, displayName, bio }
+        onProfileChange?.(next)
+        return next
+      })
+    }
     setInfo(res.ok ? 'Profile updated!' : 'Save failed'); setSaving(false)
     setTimeout(() => setInfo(''), 3000)
+  }
+
+  const uploadAvatar = async (file: File) => {
+    if (!file.type.startsWith('image/')) { setInfo('Avatar must be an image'); return }
+    if (file.size > 25 * 1024 * 1024) { setInfo('Avatar must be 25MB or smaller'); return }
+    setAvatarSaving(true)
+    setInfo('')
+    try {
+      const form = new FormData()
+      form.append('avatar', file, file.name)
+      const res = await fetch(`${API}/api/users/me/avatar`, { method: 'POST', headers: hdr, body: form })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error ?? 'Avatar upload failed')
+      setProfile(p => {
+        if (!p) return p
+        const next = { ...p, avatarUrl: data.avatarUrl, avatarThumbUrl: data.avatarThumbUrl }
+        onProfileChange?.(next)
+        return next
+      })
+      setInfo('Avatar updated!')
+    } catch (err) {
+      setInfo(err instanceof Error ? err.message : 'Avatar upload failed')
+    } finally {
+      setAvatarSaving(false)
+      if (avatarInputRef.current) avatarInputRef.current.value = ''
+      setTimeout(() => setInfo(''), 3000)
+    }
+  }
+
+  const deleteAvatar = async () => {
+    if (!profile?.avatarUrl || avatarSaving) return
+    if (!confirm('Remove avatar?')) return
+    setAvatarSaving(true)
+    try {
+      const res = await fetch(`${API}/api/users/me/avatar`, { method: 'DELETE', headers: hdr })
+      if (!res.ok) throw new Error('Remove avatar failed')
+      setProfile(p => {
+        if (!p) return p
+        const next = { ...p, avatarUrl: undefined, avatarThumbUrl: undefined }
+        onProfileChange?.(next)
+        return next
+      })
+      setInfo('Avatar removed')
+    } catch (err) {
+      setInfo(err instanceof Error ? err.message : 'Remove avatar failed')
+    } finally {
+      setAvatarSaving(false)
+      setTimeout(() => setInfo(''), 3000)
+    }
   }
 
   const startTotp = async () => {
@@ -1040,6 +1268,24 @@ function SettingsTab({ userId, token, hdr }: { userId: string; token: string; hd
     if (res.ok) { const d = await res.json(); setInfo(`Invite link: ${d.link}`); }
   }
 
+  const deleteAccount = async () => {
+    if (!confirm('Delete account permanently? This action cannot be undone.')) return
+    if (!confirm('Final confirm: delete this account now?')) return
+    setSaving(true)
+    try {
+      const res = await fetch(`${API}/api/users/me`, { method: 'DELETE', headers: hdr })
+      if (!res.ok) {
+        const d = await res.json().catch(() => null)
+        setInfo(d?.error ?? 'Delete account failed')
+        return
+      }
+      logout()
+    } finally {
+      setSaving(false)
+      setTimeout(() => setInfo(''), 3000)
+    }
+  }
+
   const TABS = [
     { key: 'profile',    label: 'Profile' },
     { key: 'security',   label: 'Security' },
@@ -1065,6 +1311,9 @@ function SettingsTab({ userId, token, hdr }: { userId: string; token: string; hd
         </div>
         <div className="p-3 border-t border-[var(--app-border-soft)]">
           <button onClick={logout} className="w-full py-2 text-xs text-red-400 hover:bg-red-950/30 rounded-xl transition-all">Sign out</button>
+          <button onClick={deleteAccount} disabled={saving} className="w-full py-2 mt-2 text-xs text-red-400 hover:bg-red-950/30 rounded-xl transition-all disabled:opacity-50">
+            {saving ? 'Deleting...' : 'Delete account'}
+          </button>
         </div>
       </div>
 
@@ -1075,6 +1324,59 @@ function SettingsTab({ userId, token, hdr }: { userId: string; token: string; hd
           {sub === 'profile' && (
             <form onSubmit={saveProfile} className="space-y-4">
               <h3 className="text-[var(--app-text)] font-bold text-lg mb-4">Profile</h3>
+              <div className="flex items-center gap-4 bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] rounded-2xl p-4">
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={e => {
+                    const file = e.target.files?.[0]
+                    if (file) void uploadAvatar(file)
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={avatarSaving}
+                  className="relative rounded-full hover:opacity-90 transition-opacity disabled:opacity-60"
+                  title="Change avatar"
+                >
+                  <Avatar
+                    name={profile?.displayName || profile?.username || '?'}
+                    size={76}
+                    src={profile?.avatarThumbUrl || profile?.avatarUrl}
+                  />
+                  <span className="absolute -right-1 -bottom-1 w-8 h-8 rounded-full bg-[var(--app-brand)] text-white border-2 border-[var(--app-panel-2)] flex items-center justify-center">
+                    <Camera size={16} weight="bold" />
+                  </span>
+                </button>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-[var(--app-text)]">Avatar</p>
+                  <p className="text-xs text-[var(--app-text-faint)] mt-1">JPG, PNG, WebP or GIF. Max 25MB.</p>
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      type="button"
+                      onClick={() => avatarInputRef.current?.click()}
+                      disabled={avatarSaving}
+                      className="px-3 py-1.5 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 text-xs font-semibold disabled:opacity-50"
+                    >
+                      {avatarSaving ? 'Uploading...' : 'Change'}
+                    </button>
+                    {(profile?.avatarUrl || profile?.avatarThumbUrl) && (
+                      <button
+                        type="button"
+                        onClick={deleteAvatar}
+                        disabled={avatarSaving}
+                        className="px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/25 text-red-400 text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1"
+                      >
+                        <Trash size={13} weight="bold" />
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
               <div>
                 <label className="block text-xs text-[var(--app-text-faint)] mb-1.5 uppercase tracking-wider">Username</label>
                 <div className="bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] rounded-xl px-4 py-2.5 text-sm text-[var(--app-text-faint)]">@{profile?.username}</div>
@@ -1140,7 +1442,7 @@ function SettingsTab({ userId, token, hdr }: { userId: string; token: string; hd
                 ? <EmptyState icon="🚫" text="No blocked users" />
                 : blocks.map(u => (
                   <div key={u.id} className="flex items-center gap-3 bg-[var(--app-panel-2)] border border-[var(--app-border-soft)] rounded-xl p-4">
-                    <Avatar name={u.username} />
+                    <Avatar name={u.username} src={u.avatarThumbUrl || u.avatarUrl} />
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-[var(--app-text)]">{u.username}</p>
                       <p className="text-xs text-[var(--app-text-faint)]">Blocked {new Date(u.createdAt * 1000).toLocaleDateString()}</p>
@@ -1440,7 +1742,7 @@ function CallsTab({ userId, username, token, hdr }: { userId: string; username: 
               ? <EmptyState icon="📞" text="No friends yet" sub="Add friends to call them" />
               : friends.map(f => (
                 <div key={f.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--app-panel-2)] transition-colors">
-                  <Avatar name={f.username} />
+                  <Avatar name={f.username} src={f.avatarThumbUrl || f.avatarUrl} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-[var(--app-text)] truncate">{f.username}</p>
                     <p className="text-xs text-green-400">Online</p>

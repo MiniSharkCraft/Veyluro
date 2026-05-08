@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ChatPage }       from './pages/ChatPage'
 import { LoginPage }      from './pages/LoginPage'
@@ -5,7 +6,16 @@ import { RecoverKeyPage } from './pages/RecoverKeyPage'
 import { useAuthStore }   from './stores/authStore'
 
 export default function App() {
-  const { isAuthenticated, needsKeyRecovery } = useAuthStore()
+  const { isAuthenticated, needsKeyRecovery, restoreSession } = useAuthStore()
+  const [booting, setBooting] = useState(true)
+
+  useEffect(() => {
+    restoreSession().finally(() => setBooting(false))
+  }, [restoreSession])
+
+  if (booting) {
+    return <div className="h-screen bg-[var(--app-bg)]" />
+  }
 
   return (
     <>
