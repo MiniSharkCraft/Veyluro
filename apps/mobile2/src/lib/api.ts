@@ -56,10 +56,21 @@ export type RoomType = {
   name: string
   type: 'dm' | 'group'
   groupAdminId?: string
+  avatarUrl?: string
+  avatarThumbUrl?: string
   memberCount?: number
   lastMessage?: string
   lastMessageAt?: number
   unreadCount?: number
+}
+
+function mapAvatarFields<T extends Record<string, any>>(obj: T): T {
+  if (!obj || typeof obj !== 'object') return obj
+  return {
+    ...obj,
+    avatarUrl: obj.avatarUrl ?? obj.avatar_url,
+    avatarThumbUrl: obj.avatarThumbUrl ?? obj.avatar_thumb_url,
+  }
 }
 export type BlockedUserType = {
   id: string
@@ -70,6 +81,8 @@ export type MemberType = {
   id: string
   username: string
   displayName?: string
+  avatarUrl?: string
+  avatarThumbUrl?: string
   publicKey: string
   fingerprint: string
 }
@@ -161,8 +174,17 @@ export type ReportType = {
 // ── API Namespaces ─────────────────────────────────────────────────────────
 
 export const roomsApi = {
-  list: () => request<RoomType[]>('/api/rooms'),
-  members: (roomId: string) => request<MemberType[]>(`/api/rooms/${roomId}/members`),
+  list: async () => {
+    const rows = await request<any[]>('/api/rooms')
+    return rows.map((r) => ({
+      ...mapAvatarFields(r),
+      groupAdminId: r.groupAdminId ?? r.group_admin_id,
+    })) as RoomType[]
+  },
+  members: async (roomId: string) => {
+    const rows = await request<any[]>(`/api/rooms/${roomId}/members`)
+    return rows.map((m) => mapAvatarFields(m)) as MemberType[]
+  },
   startDm: (username: string) => request<{ id: string }>('/api/rooms/dm', {
     method: 'POST', body: JSON.stringify({ username }),
   }),
@@ -172,10 +194,34 @@ export const roomsApi = {
   addMember: (roomId: string, username: string) => request<{ status: string }>(`/api/rooms/${roomId}/members`, {
     method: 'POST', body: JSON.stringify({ username }),
   }),
+  addMemberById: (roomId: string, userId: string) => request<{ status: string }>(`/api/rooms/${roomId}/members`, {
+    method: 'POST', body: JSON.stringify({ userId }),
+  }),
   removeMember: (roomId: string, userId: string) => request<{ status: string }>(`/api/rooms/${roomId}/members/${userId}`, {
     method: 'DELETE',
   }),
   leaveGroup: (roomId: string) => request<{ status: string }>(`/api/rooms/${roomId}/leave`, { method: 'POST' }),
+  deleteGroup: (roomId: string) => request<{ status: string }>(`/api/rooms/${roomId}`, { method: 'DELETE' }),
+  uploadAvatar: async (roomId: string, file: { uri: string; name: string; type: string }) => {
+    const token = await storage.getToken()
+    if (!token) throw new ApiError(401, 'Chưa đăng nhập')
+    const body = new FormData()
+    body.append('avatar', { uri: file.uri, name: file.name, type: file.type } as any)
+    const res = await fetch(`${BASE}/api/rooms/${roomId}/avatar`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body,
+    })
+    if (!res.ok) {
+      const parsed = await parseResponseBody(res)
+      throw new ApiError(res.status, responseErrorMessage(parsed, res.status))
+    }
+    return parseResponseBody(res) as Promise<{ avatarUrl: string; avatarThumbUrl: string; avatarKey: string }>
+  },
+  deleteAvatar: (roomId: string) => request<{ status: string }>(`/api/rooms/${roomId}/avatar`, { method: 'DELETE' }),
 }
 
 export const blocksApi = {
@@ -225,8 +271,14 @@ export const storiesApi = {
 }
 
 export const friendsApi = {
-  list: () => request<FriendType[]>('/api/friends'),
-  requests: () => request<FriendRequestType[]>('/api/friends/requests'),
+  list: async () => {
+    const rows = await request<any[]>('/api/friends')
+    return rows.map((f) => mapAvatarFields(f)) as FriendType[]
+  },
+  requests: async () => {
+    const rows = await request<any[]>('/api/friends/requests')
+    return rows.map((r) => mapAvatarFields(r)) as FriendRequestType[]
+  },
   sendRequest: (username: string) => request<{ id: string; status: string }>('/api/friends/request', {
     method: 'POST', body: JSON.stringify({ username }),
   }),
@@ -235,8 +287,11 @@ export const friendsApi = {
 }
 
 export const usersApi = {
-  search: (q: string) => request<SearchUserType[]>(`/api/users/search?q=${encodeURIComponent(q)}`),
-  me: () => request<ProfileType>('/api/users/me'),
+  search: async (q: string) => {
+    const rows = await request<any[]>(`/api/users/search?q=${encodeURIComponent(q)}`)
+    return rows.map((u) => mapAvatarFields(u)) as SearchUserType[]
+  },
+  me: async () => mapAvatarFields(await request<any>('/api/users/me')) as ProfileType,
   updateProfile: (data: { displayName?: string; bio?: string; username?: string }) =>
     request<UpdateProfileResponse>('/api/users/me', { method: 'PATCH', body: JSON.stringify(data) }),
   uploadAvatar: async (file: { uri: string; name: string; type: string }) => {

@@ -11,7 +11,9 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -31,6 +33,10 @@ type Client struct {
 	publicBaseURL   string
 	endpoint        string
 	httpClient      *http.Client
+	warnBytes       int64
+	blockBytes      int64
+	cachedUsage     atomic.Int64
+	lastRefreshUnix atomic.Int64
 }
 
 func New(cfg Config) *Client {
@@ -48,6 +54,39 @@ func New(cfg Config) *Client {
 	}
 }
 
+func (c *Client) SetBucketLimits(warnBytes, blockBytes int64) {
+	if c == nil {
+		return
+	}
+	c.warnBytes = warnBytes
+	c.blockBytes = blockBytes
+}
+
+func (c *Client) SeedUsageBytes(usage int64) {
+	if c == nil || usage < 0 {
+		return
+	}
+	c.cachedUsage.Store(usage)
+	c.lastRefreshUnix.Store(time.Now().Unix())
+}
+
+func (c *Client) CurrentUsageBytes() int64 {
+	if c == nil {
+		return 0
+	}
+	return c.cachedUsage.Load()
+}
+
+func (c *Client) UsageWarn() (usage, warn, block int64, overWarn, overBlock bool) {
+	if c == nil {
+		return 0, 0, 0, false, false
+	}
+	usage = c.cachedUsage.Load()
+	warn = c.warnBytes
+	block = c.blockBytes
+	return usage, warn, block, warn > 0 && usage >= warn, block > 0 && usage >= block
+}
+
 func (c *Client) PutObject(ctx context.Context, key, contentType string, body []byte) (string, error) {
 	if c == nil {
 		return "", fmt.Errorf("r2 chưa cấu hình")
@@ -56,6 +95,8 @@ func (c *Client) PutObject(ctx context.Context, key, contentType string, body []
 	if err != nil {
 		return "", err
 	}
+	// Object keys are immutable (uuid-based), so force long cache to reduce R2 read costs.
+	req.Header.Set("Cache-Control", "public, max-age=31536000, immutable")
 	res, err := c.httpClient.Do(req)
 	if err != nil {
 		return "", err
@@ -65,6 +106,7 @@ func (c *Client) PutObject(ctx context.Context, key, contentType string, body []
 		msg, _ := io.ReadAll(io.LimitReader(res.Body, 2048))
 		return "", fmt.Errorf("r2 upload failed: %s %s", res.Status, strings.TrimSpace(string(msg)))
 	}
+	c.cachedUsage.Add(int64(len(body)))
 	return c.PublicURL(key), nil
 }
 
@@ -91,6 +133,18 @@ func (c *Client) DeleteObject(ctx context.Context, key string) error {
 	return nil
 }
 
+func (c *Client) CanUpload(ctx context.Context, incomingBytes int64) (bool, int64, int64, error) {
+	_ = ctx
+	if c == nil {
+		return false, 0, 0, fmt.Errorf("r2 chưa cấu hình")
+	}
+	if c.blockBytes <= 0 {
+		return true, c.cachedUsage.Load(), 0, nil
+	}
+	usage := c.cachedUsage.Load()
+	return usage+incomingBytes <= c.blockBytes, usage, c.blockBytes, nil
+}
+
 func (c *Client) PublicURL(key string) string {
 	if c.publicBaseURL != "" {
 		return c.publicBaseURL + "/" + escapeKeyPath(key)
@@ -113,7 +167,10 @@ func (c *Client) signedRequest(ctx context.Context, method, key, contentType str
 	now := time.Now().UTC()
 	amzDate := now.Format("20060102T150405Z")
 	dateStamp := now.Format("20060102")
-	uriPath := "/" + url.PathEscape(c.bucket) + "/" + escapeKeyPath(key)
+	uriPath := "/" + url.PathEscape(c.bucket)
+	if key != "" {
+		uriPath += "/" + escapeKeyPath(key)
+	}
 	reqURL := c.endpoint + uriPath
 
 	payloadHashBytes := sha256.Sum256(body)
@@ -159,6 +216,17 @@ func (c *Client) signedRequest(ctx context.Context, method, key, contentType str
 	req.Header.Set("X-Amz-Content-Sha256", payloadHash)
 	req.Header.Set("Authorization", "AWS4-HMAC-SHA256 Credential="+c.accessKeyID+"/"+scope+", SignedHeaders="+signedHeaders+", Signature="+signature)
 	return req, nil
+}
+
+func (c *Client) UsageDebug() string {
+	if c == nil {
+		return "r2=nil"
+	}
+	last := c.lastRefreshUnix.Load()
+	return "usage=" + strconv.FormatInt(c.cachedUsage.Load(), 10) +
+		" warn=" + strconv.FormatInt(c.warnBytes, 10) +
+		" block=" + strconv.FormatInt(c.blockBytes, 10) +
+		" lastRefresh=" + strconv.FormatInt(last, 10)
 }
 
 func signingKey(secret, dateStamp string) []byte {

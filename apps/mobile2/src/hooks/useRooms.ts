@@ -10,7 +10,42 @@ export function useRooms() {
 
   const fetchRooms = useCallback(async () => {
     try {
-      setRooms(await roomsApi.list())
+      const baseRooms = await roomsApi.list()
+      const myId = await storage.getUserId()
+      if (!myId) {
+        setRooms(baseRooms)
+        return
+      }
+
+      const missingAvatars = baseRooms.filter(r => r.type === 'dm' && !r.avatarUrl && !r.avatarThumbUrl)
+      if (!missingAvatars.length) {
+        setRooms(baseRooms)
+        return
+      }
+
+      const memberRows = await Promise.all(
+        missingAvatars.map(async room => {
+          try {
+            const members = await roomsApi.members(room.id)
+            const other = members.find(m => m.id !== myId)
+            return { roomId: room.id, avatarUrl: other?.avatarUrl, avatarThumbUrl: other?.avatarThumbUrl }
+          } catch {
+            return { roomId: room.id, avatarUrl: undefined, avatarThumbUrl: undefined }
+          }
+        }),
+      )
+
+      const avatarByRoom = new Map(memberRows.map(m => [m.roomId, m]))
+      setRooms(baseRooms.map(room => {
+        if (room.type !== 'dm' || room.avatarUrl || room.avatarThumbUrl) return room
+        const fallback = avatarByRoom.get(room.id)
+        if (!fallback) return room
+        return {
+          ...room,
+          avatarUrl: fallback.avatarUrl ?? room.avatarUrl,
+          avatarThumbUrl: fallback.avatarThumbUrl ?? room.avatarThumbUrl,
+        }
+      }))
     } catch (e) {
       console.warn('[useRooms]', e)
     } finally {

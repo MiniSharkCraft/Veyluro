@@ -13,10 +13,13 @@ import {
   DoorOpenIcon,
   FlagIcon,
   ImageSquareIcon,
+  CameraIcon,
   PaperPlaneTiltIcon,
   PhoneIcon,
   ProhibitIcon,
+  TrashIcon,
   UserIcon,
+  UserPlusIcon,
   UsersThreeIcon,
 } from 'phosphor-react-native'
 import { useChat } from '../../../src/hooks/useChat'
@@ -43,7 +46,9 @@ export default function RoomScreen() {
   const [myUsername, setMyUsername] = useState<string | null>(null)
   const [roomType, setRoomType] = useState<'dm' | 'group'>('dm')
   const [roomName, setRoomName] = useState('Phòng chat')
+  const [roomAvatar, setRoomAvatar] = useState<{ avatarUrl?: string; avatarThumbUrl?: string }>({})
   const [isGroupAdmin, setIsGroupAdmin] = useState(false)
+  const [memberToAdd, setMemberToAdd] = useState('')
   const flatRef = useRef<FlatList>(null)
 
   // Modals
@@ -76,23 +81,28 @@ export default function RoomScreen() {
   useEffect(() => {
     if (!members.length || !myId) return
     const others = members.filter(m => m.id !== myId)
-    if (members.length > 2) {
-      setRoomType('group')
-      const room = rooms.find(r => r.id === roomId)
+    const room = rooms.find(r => r.id === roomId)
+    const resolvedType: 'dm' | 'group' = room?.type ?? (members.length > 2 ? 'group' : 'dm')
+
+    setRoomType(resolvedType)
+    if (resolvedType === 'group') {
       setRoomName(room?.name ?? others.map(m => m.username).join(', '))
-    } else {
-      setRoomType('dm')
-      setRoomName(others[0]?.username ?? 'Chat')
+      setRoomAvatar({ avatarUrl: room?.avatarUrl, avatarThumbUrl: room?.avatarThumbUrl })
+      return
     }
+
+    setRoomName(others[0]?.username ?? 'Chat')
+    setRoomAvatar({ avatarUrl: others[0]?.avatarUrl, avatarThumbUrl: others[0]?.avatarThumbUrl })
   }, [members, myId, rooms, roomId])
 
   // Check if I'm group admin
   useEffect(() => {
-    if (roomType !== 'group') return
-    const room = rooms.find(r => r.id === roomId)
-    if (room?.groupAdminId && myId && room.groupAdminId === myId) {
-      setIsGroupAdmin(true)
+    if (roomType !== 'group' || !myId) {
+      setIsGroupAdmin(false)
+      return
     }
+    const room = rooms.find(r => r.id === roomId)
+    setIsGroupAdmin(Boolean(room?.groupAdminId && room.groupAdminId === myId))
   }, [roomId, roomType, myId, rooms])
 
   useEffect(() => {
@@ -206,6 +216,75 @@ export default function RoomScreen() {
     ])
   }
 
+  const handleAddMember = async () => {
+    const username = memberToAdd.trim().replace(/^@/, '')
+    if (!username) return
+    try {
+      await roomsApi.addMember(roomId, username)
+      setMemberToAdd('')
+      Alert.alert('Đã thêm', `Đã thêm @${username} vào nhóm`)
+    } catch (e) {
+      Alert.alert('Lỗi', e instanceof Error ? e.message : 'Không thêm được thành viên')
+    }
+  }
+
+  const handleUploadGroupAvatar = async () => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      if (!perm.granted) {
+        Alert.alert('Thiếu quyền', 'Cho phép truy cập ảnh để đổi avatar nhóm.')
+        return
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.9,
+        allowsEditing: true,
+        aspect: [1, 1],
+      })
+      if (result.canceled || !result.assets?.[0]) return
+      const asset = result.assets[0]
+      const mime = asset.mimeType || guessImageMime(asset.uri, asset.fileName)
+      const ext = extensionFromMime(mime, asset.fileName)
+      const uploaded = await roomsApi.uploadAvatar(roomId, {
+        uri: asset.uri,
+        name: asset.fileName ?? `group-avatar.${ext}`,
+        type: mime,
+      })
+      setRoomAvatar({ avatarUrl: uploaded.avatarUrl, avatarThumbUrl: uploaded.avatarThumbUrl })
+      Alert.alert('OK', 'Đổi avatar nhóm thành công')
+    } catch (e) {
+      Alert.alert('Lỗi avatar nhóm', e instanceof Error ? e.message : 'Không đổi được avatar nhóm')
+    }
+  }
+
+  const handleDeleteGroupAvatar = async () => {
+    try {
+      await roomsApi.deleteAvatar(roomId)
+      setRoomAvatar({})
+      Alert.alert('OK', 'Đã xóa avatar nhóm')
+    } catch (e) {
+      Alert.alert('Lỗi', e instanceof Error ? e.message : 'Không xóa được avatar nhóm')
+    }
+  }
+
+  const handleDeleteGroup = () => {
+    Alert.alert('Xóa nhóm', 'Hành động này không thể hoàn tác. Xóa luôn nhóm?', [
+      { text: 'Hủy', style: 'cancel' },
+      {
+        text: 'Xóa nhóm', style: 'destructive',
+        onPress: async () => {
+          try {
+            await roomsApi.deleteGroup(roomId)
+            Alert.alert('Đã xóa', 'Nhóm đã được xóa')
+            router.back()
+          } catch (e) {
+            Alert.alert('Lỗi', e instanceof Error ? e.message : 'Không xóa được nhóm')
+          }
+        },
+      },
+    ])
+  }
+
   const displayTitle = roomType === 'group'
     ? (roomName || 'Nhóm chat')
     : (otherMember?.username ? `@${otherMember.username}` : 'Chat')
@@ -222,13 +301,29 @@ export default function RoomScreen() {
         </TouchableOpacity>
 
         {roomType === 'group' ? (
-          <View style={[s.avatar, { backgroundColor: '#1E1B4B' }]}>
-            <UsersThreeIcon size={20} color="#A5B4FC" weight="fill" />
-          </View>
+          roomAvatar.avatarUrl ? (
+            <Image
+              source={{ uri: roomAvatar.avatarThumbUrl || roomAvatar.avatarUrl, cache: 'force-cache' }}
+              style={s.avatarImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={[s.avatar, { backgroundColor: '#1E1B4B' }]}>
+              <UsersThreeIcon size={20} color="#A5B4FC" weight="fill" />
+            </View>
+          )
         ) : (
-          <View style={[s.avatar, { backgroundColor: avatarBg(displayTitle) }]}>
-            <Text style={s.avatarTxt}>{displayTitle[0]?.toUpperCase() ?? '?'}</Text>
-          </View>
+          otherMember?.avatarUrl ? (
+            <Image
+              source={{ uri: otherMember.avatarThumbUrl || otherMember.avatarUrl, cache: 'force-cache' }}
+              style={s.avatarImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={[s.avatar, { backgroundColor: avatarBg(displayTitle) }]}>
+              <Text style={s.avatarTxt}>{displayTitle[0]?.toUpperCase() ?? '?'}</Text>
+            </View>
+          )
         )}
 
         <View style={s.headerInfo}>
@@ -323,10 +418,30 @@ export default function RoomScreen() {
               </>
             )}
             {roomType === 'group' && (
-              <TouchableOpacity style={mm.item} onPress={() => { setMenuModal(false); handleLeaveGroup() }}>
-                <DoorOpenIcon size={17} color="#EF4444" weight="bold" />
-                <Text style={[mm.itemTxt, { color: '#EF4444' }]}>Rời nhóm</Text>
-              </TouchableOpacity>
+              <>
+                {isGroupAdmin && (
+                  <TouchableOpacity style={mm.item} onPress={() => { setMenuModal(false); handleUploadGroupAvatar() }}>
+                    <CameraIcon size={17} color="#E2E8F0" weight="bold" />
+                    <Text style={mm.itemTxt}>Đổi avatar nhóm</Text>
+                  </TouchableOpacity>
+                )}
+                {isGroupAdmin && !!roomAvatar.avatarUrl && (
+                  <TouchableOpacity style={mm.item} onPress={() => { setMenuModal(false); handleDeleteGroupAvatar() }}>
+                    <TrashIcon size={17} color="#F59E0B" weight="bold" />
+                    <Text style={[mm.itemTxt, { color: '#F59E0B' }]}>Xóa avatar nhóm</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity style={mm.item} onPress={() => { setMenuModal(false); handleLeaveGroup() }}>
+                  <DoorOpenIcon size={17} color="#EF4444" weight="bold" />
+                  <Text style={[mm.itemTxt, { color: '#EF4444' }]}>Rời nhóm</Text>
+                </TouchableOpacity>
+                {isGroupAdmin && (
+                  <TouchableOpacity style={mm.item} onPress={() => { setMenuModal(false); handleDeleteGroup() }}>
+                    <TrashIcon size={17} color="#EF4444" weight="bold" />
+                    <Text style={[mm.itemTxt, { color: '#EF4444' }]}>Xóa nhóm</Text>
+                  </TouchableOpacity>
+                )}
+              </>
             )}
             <TouchableOpacity style={[mm.item, { borderBottomWidth: 0 }]} onPress={() => setMenuModal(false)}>
               <Text style={[mm.itemTxt, { color: '#64748B' }]}>Đóng</Text>
@@ -341,11 +456,30 @@ export default function RoomScreen() {
           <View style={bm.sheet}>
             <View style={bm.handle} />
             <Text style={bm.title}>Thành viên nhóm</Text>
+            {isGroupAdmin && (
+              <View style={bm.addWrap}>
+                <TextInput
+                  style={bm.addInput}
+                  value={memberToAdd}
+                  onChangeText={setMemberToAdd}
+                  placeholder="username cần thêm"
+                  placeholderTextColor="#64748B"
+                  autoCapitalize="none"
+                />
+                <TouchableOpacity style={bm.addBtn} onPress={handleAddMember}>
+                  <UserPlusIcon size={16} color="#A5B4FC" weight="bold" />
+                </TouchableOpacity>
+              </View>
+            )}
             {members.map(m => (
               <View key={m.id} style={bm.row}>
-                <View style={[bm.avatar, { backgroundColor: avatarBg(m.username) }]}>
-                  <Text style={bm.avatarTxt}>{m.username[0]?.toUpperCase()}</Text>
-                </View>
+                {m.avatarUrl ? (
+                  <Image source={{ uri: m.avatarThumbUrl || m.avatarUrl, cache: 'force-cache' }} style={bm.avatarImage} resizeMode="cover" />
+                ) : (
+                  <View style={[bm.avatar, { backgroundColor: avatarBg(m.username) }]}>
+                    <Text style={bm.avatarTxt}>{m.username[0]?.toUpperCase()}</Text>
+                  </View>
+                )}
                 <Text style={bm.memberName} numberOfLines={1}>
                   @{m.username}{m.id === myId ? ' (bạn)' : ''}
                 </Text>
@@ -441,9 +575,17 @@ export default function RoomScreen() {
               return (
                 <View style={[s.msgRow, item.mine ? s.msgRight : s.msgLeft, grouped && { marginTop: 2 }]}>
                   {!item.mine && (
-                    <View style={[s.msgAvatar, { backgroundColor: avatarBg(senderName) }, grouped && { opacity: 0 }]}>
-                      <Text style={s.msgAvatarTxt}>{senderName[0]?.toUpperCase()}</Text>
-                    </View>
+                    sender?.avatarUrl ? (
+                      <Image
+                        source={{ uri: sender.avatarThumbUrl || sender.avatarUrl, cache: 'force-cache' }}
+                        style={[s.msgAvatarImage, grouped && { opacity: 0 }]}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={[s.msgAvatar, { backgroundColor: avatarBg(senderName) }, grouped && { opacity: 0 }]}>
+                        <Text style={s.msgAvatarTxt}>{senderName[0]?.toUpperCase()}</Text>
+                      </View>
+                    )
                   )}
                   <View style={[s.msgBlock, item.mine ? s.msgBlockMine : s.msgBlockTheirs]}>
                     {!item.mine && !grouped && roomType === 'group' && (
@@ -452,7 +594,7 @@ export default function RoomScreen() {
                     <View style={[s.bubble, item.attachment && s.imageBubble, item.mine ? s.bubbleMine : s.bubbleTheirs, item.pending && { opacity: 0.6 }]}>
                       {item.attachment?.kind === 'image' && (
                         <Image
-                          source={{ uri: item.attachment.localUri || item.attachment.thumbUrl || item.attachment.url }}
+                          source={{ uri: item.attachment.localUri || item.attachment.thumbUrl || item.attachment.url, cache: 'force-cache' }}
                           style={[s.bubbleImage, { width: imageSize, height: imageSize }]}
                           resizeMode="cover"
                         />
@@ -543,8 +685,12 @@ const bm = StyleSheet.create({
   sheet:       { backgroundColor: '#0E0E1C', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 40, borderTopWidth: 1, borderColor: '#1A1A2E' },
   handle:      { width: 40, height: 4, backgroundColor: '#2E2E45', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   title:       { color: '#F1F5F9', fontSize: 18, fontWeight: '700', marginBottom: 16 },
+  addWrap:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  addInput:    { flex: 1, backgroundColor: '#12121E', borderRadius: 10, borderWidth: 1, borderColor: '#1E1E30', color: '#E2E8F0', paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
+  addBtn:      { width: 40, height: 40, borderRadius: 20, backgroundColor: '#1E1B4B', alignItems: 'center', justifyContent: 'center' },
   row:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
   avatar:      { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  avatarImage: { width: 40, height: 40, borderRadius: 20, marginRight: 12, backgroundColor: '#0B1020' },
   avatarTxt:   { color: '#fff', fontSize: 15, fontWeight: '700' },
   memberName:  { flex: 1, color: '#F1F5F9', fontSize: 15, fontWeight: '500' },
   reportBtn:   { padding: 8, backgroundColor: '#1C1208', borderRadius: 8 },
@@ -577,6 +723,7 @@ const s = StyleSheet.create({
   header:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0E0E1C', paddingHorizontal: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#12121E' },
   backBtn:     { padding: 6, marginRight: 2 },
   avatar:      { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  avatarImage: { width: 40, height: 40, borderRadius: 20, marginRight: 10, backgroundColor: '#0B1020' },
   avatarTxt:   { color: '#fff', fontSize: 16, fontWeight: '700' },
   headerInfo:  { flex: 1 },
   headerName:  { color: '#F1F5F9', fontSize: 16, fontWeight: '700' },
@@ -593,6 +740,7 @@ const s = StyleSheet.create({
   msgBlockMine:{ alignItems: 'flex-end' },
   msgBlockTheirs:{ alignItems: 'flex-start' },
   msgAvatar:   { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
+  msgAvatarImage: { width: 28, height: 28, borderRadius: 14, marginRight: 8, backgroundColor: '#0B1020' },
   msgAvatarTxt:{ color: '#fff', fontSize: 11, fontWeight: '700' },
   bubble:      { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
   imageBubble: { padding: 4, overflow: 'hidden' },

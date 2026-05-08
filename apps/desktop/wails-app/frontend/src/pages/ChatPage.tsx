@@ -22,7 +22,7 @@ import { useAuthStore, API, WS_BASE } from '../stores/authStore'
 import { encryptMessage, decryptMessage, encryptPrivateKeyWithPassphrase } from '../lib/crypto'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface Room      { id: string; name: string; type: 'dm'|'group'; groupAdminId?: string; memberCount?: number; lastMessageAt?: number }
+interface Room      extends AvatarFields { id: string; name: string; type: 'dm'|'group'; groupAdminId?: string; memberCount?: number; lastMessageAt?: number }
 interface AvatarFields { avatarUrl?: string; avatarThumbUrl?: string }
 interface Member    extends AvatarFields { id: string; username: string; publicKey: string; fingerprint: string }
 interface Attachment { kind: 'image'; url: string; thumbUrl?: string; key: string; mime: string; size: number; name?: string; localUri?: string }
@@ -142,7 +142,7 @@ export function ChatPage() {
       </nav>
 
       {/* Content */}
-      {tab === 'chats'    && <ChatsTab   userId={userId!} username={username!} token={token!} privateKey={privateKey!} publicKey={resolvedPublicKey} hdr={hdr} onOpenNotes={() => setTab('notes')} />}
+      {tab === 'chats'    && <ChatsTab   userId={userId!} username={username!} token={token!} privateKey={privateKey!} publicKey={resolvedPublicKey} hdr={hdr} />}
       {tab === 'friends'  && <FriendsTab userId={userId!} username={username!} token={token!} hdr={hdr} />}
       {tab === 'pending'  && <PendingTab userId={userId!} token={token!} privateKey={privateKey!} publicKey={resolvedPublicKey} hdr={hdr} />}
       {tab === 'stories'  && <StoriesTab userId={userId!} username={username!} hdr={hdr} />}
@@ -155,10 +155,9 @@ export function ChatPage() {
 }
 
 // ─── CHATS TAB ────────────────────────────────────────────────────────────────
-function ChatsTab({ userId, username, token, privateKey, publicKey, hdr, onOpenNotes }: {
+function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
   userId: string; username: string; token: string
   privateKey: CryptoKey; publicKey: string; hdr: Record<string, string>
-  onOpenNotes: () => void
 }) {
   const [rooms,    setRooms]    = useState<Room[]>([])
   const [active,   setActive]   = useState<Room | null>(null)
@@ -179,6 +178,7 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr, onOpenN
   const wsRef     = useRef<WebSocket | null>(null)
   const inputRef  = useRef<HTMLInputElement>(null)
   const fileRef   = useRef<HTMLInputElement>(null)
+  const groupAvatarRef = useRef<HTMLInputElement>(null)
 
   const fetchRooms = useCallback(async () => {
     const res = await fetch(`${API}/api/rooms`, { headers: hdr })
@@ -272,6 +272,8 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr, onOpenN
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim() || !active || !privateKey || !userId) return
+    const text = input.trim()
+    setInput('')
     setSending(true)
     setSendErr('')
     try {
@@ -290,15 +292,15 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr, onOpenN
       recipients.push({ id: userId, publicKey: myPublicKey })
       currentMembers.filter(m => m.id !== userId && m.publicKey).forEach(m => recipients.push({ id: m.id, publicKey: m.publicKey }))
       if (recipients.length < 2) { setSendErr('Cannot find recipient keys'); setSending(false); return }
-      const bundle = await encryptMessage(input.trim(), recipients)
+      const bundle = await encryptMessage(text, recipients)
       const res = await fetch(`${API}/api/messages/${active.id}`, {
         method: 'POST', headers: { ...hdr, 'Content-Type': 'application/json' },
         body: JSON.stringify({ bundle: JSON.stringify(bundle) }),
       })
-      if (!res.ok) { setSendErr('Failed to send message'); return }
-      setInput('')
+      if (!res.ok) { setSendErr('Failed to send message'); setInput(prev => (prev ? prev : text)); return }
       inputRef.current?.focus()
     } catch (err) {
+      setInput(prev => (prev ? prev : text))
       setSendErr(err instanceof Error ? err.message : 'Send failed')
     } finally { setSending(false) }
   }
@@ -399,6 +401,92 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr, onOpenN
     return parts.find(p => p.trim() !== username)?.trim() ?? parts[0]?.trim() ?? r.name
   }
 
+  const refreshActiveRoom = useCallback((nextRooms?: Room[]) => {
+    const source = nextRooms ?? rooms
+    setActive(prev => {
+      if (!prev) return prev
+      const found = source.find(r => r.id === prev.id)
+      return found ?? prev
+    })
+  }, [rooms])
+
+  const addGroupMember = async () => {
+    if (!active || active.type !== 'group') return
+    const raw = prompt('Username cần thêm vào nhóm')
+    const username = raw?.trim().replace(/^@/, '')
+    if (!username) return
+    const res = await fetch(`${API}/api/rooms/${active.id}/members`, {
+      method: 'POST',
+      headers: { ...hdr, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username }),
+    })
+    const data = await res.json().catch(() => null)
+    if (!res.ok) {
+      setSendErr(data?.error ?? 'Add member failed')
+      return
+    }
+    const mRes = await fetch(`${API}/api/rooms/${active.id}/members`, { headers: hdr })
+    if (mRes.ok) setMembers(await mRes.json())
+    const rRes = await fetch(`${API}/api/rooms`, { headers: hdr })
+    if (rRes.ok) {
+      const next = await rRes.json()
+      setRooms(next)
+      refreshActiveRoom(next)
+    }
+  }
+
+  const uploadGroupAvatar = async (file: File) => {
+    if (!active || active.type !== 'group') return
+    if (!file.type.startsWith('image/')) {
+      setSendErr('Only image files are supported')
+      return
+    }
+    if (file.size > 25 * 1024 * 1024) {
+      setSendErr('Group avatar must be 25MB or smaller')
+      return
+    }
+    const form = new FormData()
+    form.append('avatar', file, file.name)
+    const res = await fetch(`${API}/api/rooms/${active.id}/avatar`, {
+      method: 'POST',
+      headers: hdr,
+      body: form,
+    })
+    const data = await res.json().catch(() => null)
+    if (!res.ok) {
+      setSendErr(data?.error ?? 'Upload group avatar failed')
+      return
+    }
+    setActive(prev => prev ? ({ ...prev, avatarUrl: data?.avatarUrl ?? prev.avatarUrl, avatarThumbUrl: data?.avatarThumbUrl ?? prev.avatarThumbUrl }) : prev)
+    setRooms(prev => prev.map(r => r.id === active.id ? ({ ...r, avatarUrl: data?.avatarUrl ?? r.avatarUrl, avatarThumbUrl: data?.avatarThumbUrl ?? r.avatarThumbUrl }) : r))
+  }
+
+  const removeGroupAvatar = async () => {
+    if (!active || active.type !== 'group') return
+    if (!confirm('Remove group avatar?')) return
+    const res = await fetch(`${API}/api/rooms/${active.id}/avatar`, { method: 'DELETE', headers: hdr })
+    const data = await res.json().catch(() => null)
+    if (!res.ok) {
+      setSendErr(data?.error ?? 'Remove group avatar failed')
+      return
+    }
+    setActive(prev => prev ? ({ ...prev, avatarUrl: undefined, avatarThumbUrl: undefined }) : prev)
+    setRooms(prev => prev.map(r => r.id === active.id ? ({ ...r, avatarUrl: undefined, avatarThumbUrl: undefined }) : r))
+  }
+
+  const deleteGroup = async () => {
+    if (!active || active.type !== 'group') return
+    if (!confirm('Delete this group permanently?')) return
+    const res = await fetch(`${API}/api/rooms/${active.id}`, { method: 'DELETE', headers: hdr })
+    const data = await res.json().catch(() => null)
+    if (!res.ok) {
+      setSendErr(data?.error ?? 'Delete group failed')
+      return
+    }
+    setActive(null)
+    fetchRooms()
+  }
+
   const fmt = (ts: number) => {
     if (!ts) return ''
     const d = new Date(ts * 1000), now = new Date()
@@ -437,19 +525,13 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr, onOpenN
 
         <div className="px-4 pb-4 border-b border-[var(--app-border-soft)]">
           <div className="flex gap-4 overflow-x-auto pb-1">
-            <button onClick={onOpenNotes} className="w-[68px] shrink-0 text-left">
-              <div className="w-14 h-14 rounded-full bg-[var(--app-panel-2)] flex items-center justify-center mb-2">
-                <Plus size={20} weight="bold" className="text-[var(--app-text)]" />
-              </div>
-              <p className="text-[11px] font-semibold text-[var(--app-text-soft)] truncate">My note</p>
-            </button>
             {rooms.slice(0, 8).map(r => (
               <button key={r.id} onClick={() => openRoom(r)} className="w-[76px] shrink-0 text-center">
                 <div className="relative inline-flex flex-col items-center">
                   <div className="max-w-[86px] min-h-8 rounded-2xl px-2 py-1 bg-[var(--app-panel-2)] text-[11px] leading-3 font-bold text-[var(--app-text)] mb-[-10px] z-10">
                     {r.type === 'group' ? 'Group E2EE' : 'E2EE'}
                   </div>
-                  <Avatar name={roomDisplayName(r)} size={58} />
+                  <Avatar name={roomDisplayName(r)} size={58} src={r.avatarThumbUrl || r.avatarUrl} />
                   <span className="absolute right-1 bottom-0 w-3.5 h-3.5 rounded-full bg-green-500 border-[3px] border-[var(--app-panel)]" />
                 </div>
                 <p className="mt-2 text-[11px] font-semibold text-[var(--app-text)] truncate">{roomDisplayName(r)}</p>
@@ -526,7 +608,7 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr, onOpenN
               className={`w-full flex items-center gap-3 px-3 py-3 rounded-2xl transition-colors ${
                 active?.id === r.id ? 'bg-[var(--app-brand-soft)] text-[var(--app-brand)]' : 'hover:bg-[var(--app-panel-2)]'
               }`}>
-              <Avatar name={roomDisplayName(r)} />
+              <Avatar name={roomDisplayName(r)} src={r.avatarThumbUrl || r.avatarUrl} />
               <div className="flex-1 min-w-0 text-left">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-bold text-[var(--app-text)] truncate">
@@ -550,7 +632,7 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr, onOpenN
         {active ? (
           <>
             <header className="flex items-center gap-3 px-6 py-3 border-b border-[var(--app-border-soft)] bg-[var(--app-bg)] shrink-0">
-              <Avatar name={activeDisplayName} size={38} />
+              <Avatar name={activeDisplayName} size={38} src={active.avatarThumbUrl || active.avatarUrl} />
               <div className="flex-1">
                 <p className="font-bold text-[var(--app-text)] text-sm">{activeDisplayName}</p>
                 <p className="text-xs text-green-400 flex items-center gap-1">
@@ -559,8 +641,53 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr, onOpenN
                 </p>
               </div>
               {active.type === 'group' && (
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                   {members.slice(0, 4).map(m => <Avatar key={m.id} name={m.username} size={22} src={m.avatarThumbUrl || m.avatarUrl} />)}
+                  <input
+                    ref={groupAvatarRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif"
+                    className="hidden"
+                    onChange={e => {
+                      const file = e.target.files?.[0]
+                      if (file) void uploadGroupAvatar(file)
+                      if (groupAvatarRef.current) groupAvatarRef.current.value = ''
+                    }}
+                  />
+                  {active.groupAdminId === userId && (
+                    <>
+                      <button
+                        onClick={addGroupMember}
+                        className="w-7 h-7 rounded-full bg-[var(--app-panel)] border border-[var(--app-border-soft)] text-[var(--app-text-faint)] hover:text-[var(--app-brand)] hover:border-[var(--app-brand)]/40 transition-all text-xs"
+                        title="Add member"
+                      >
+                        <Plus size={14} weight="bold" className="mx-auto" />
+                      </button>
+                      <button
+                        onClick={() => groupAvatarRef.current?.click()}
+                        className="w-7 h-7 rounded-full bg-[var(--app-panel)] border border-[var(--app-border-soft)] text-[var(--app-text-faint)] hover:text-[var(--app-brand)] hover:border-[var(--app-brand)]/40 transition-all"
+                        title="Change group avatar"
+                      >
+                        <Camera size={14} weight="bold" className="mx-auto" />
+                      </button>
+                      {(active.avatarUrl || active.avatarThumbUrl) && (
+                        <button
+                          onClick={removeGroupAvatar}
+                          className="w-7 h-7 rounded-full bg-[var(--app-panel)] border border-[var(--app-border-soft)] text-[var(--app-text-faint)] hover:text-orange-400 hover:border-orange-500/40 transition-all"
+                          title="Remove group avatar"
+                        >
+                          <Trash size={14} weight="bold" className="mx-auto" />
+                        </button>
+                      )}
+                      <button
+                        onClick={deleteGroup}
+                        className="w-7 h-7 rounded-full bg-[var(--app-panel)] border border-[var(--app-border-soft)] text-[var(--app-text-faint)] hover:text-red-400 hover:border-red-500/40 transition-all"
+                        title="Delete group"
+                      >
+                        ✕
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </header>
@@ -630,7 +757,7 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr, onOpenN
               </button>
               <input ref={inputRef}
                 className="flex-1 bg-[var(--app-panel)] border border-transparent rounded-full px-4 py-3 text-sm text-[var(--app-text)] placeholder:text-[var(--app-text-faint)] focus:outline-none focus:border-[var(--app-brand)]/40 transition-colors"
-                placeholder={sendingImage ? 'Uploading image...' : 'Write a message...'} value={input} onChange={e => { setInput(e.target.value); if (sendErr) setSendErr('') }} disabled={sending} />
+                placeholder={sendingImage ? 'Uploading image...' : 'Write a message...'} value={input} onChange={e => { setInput(e.target.value); if (sendErr) setSendErr('') }} />
               <button type="submit" disabled={sending || !input.trim()}
                 className="w-11 h-11 rounded-full bg-[var(--app-brand-soft)] text-[var(--app-brand)] flex items-center justify-center hover:scale-105 transition-all disabled:opacity-30">
                 <PaperPlaneTilt size={20} weight="fill" />

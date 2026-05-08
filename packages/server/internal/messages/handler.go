@@ -261,6 +261,17 @@ func (h *Handler) uploadAttachment(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "ảnh tối đa 50MB", http.StatusRequestEntityTooLarge)
 		return
 	}
+	allowed, usage, limit, quotaErr := h.r2.CanUpload(r.Context(), int64(len(data)))
+	if quotaErr != nil {
+		log.Printf("[attachment] quota check failed user=%s room=%s err=%v", userID, roomID, quotaErr)
+		jsonError(w, "quota check failed", http.StatusServiceUnavailable)
+		return
+	}
+	if !allowed {
+		log.Printf("[attachment] blocked by quota user=%s room=%s size=%d usage=%d limit=%d", userID, roomID, len(data), usage, limit)
+		jsonError(w, "bucket gần đầy, tạm khóa upload", http.StatusInsufficientStorage)
+		return
+	}
 	contentType, ext, ok := detectImageAttachmentType(data, header.Header.Get("Content-Type"), header.Filename)
 	if !ok {
 		jsonError(w, "chỉ hỗ trợ JPEG, PNG, WebP hoặc GIF", http.StatusBadRequest)
@@ -315,7 +326,61 @@ func isMember(db *sql.DB, r *http.Request, roomID, userID string) bool {
 	db.QueryRowContext(r.Context(),
 		`SELECT COUNT(*) FROM room_members WHERE room_id=? AND user_id=?`, roomID, userID,
 	).Scan(&cnt)
-	return cnt > 0
+	if cnt > 0 {
+		return true
+	}
+	recovered, err := recoverDMMembership(db, r, roomID, userID)
+	if err != nil {
+		log.Printf("[room_members] recover failed room=%s user=%s err=%v", roomID, userID, err)
+		return false
+	}
+	return recovered
+}
+
+func recoverDMMembership(db *sql.DB, r *http.Request, roomID, userID string) (bool, error) {
+	var roomType, roomName string
+	if err := db.QueryRowContext(r.Context(),
+		`SELECT type, name FROM rooms WHERE id=? LIMIT 1`, roomID,
+	).Scan(&roomType, &roomName); err != nil {
+		return false, err
+	}
+	if roomType != "dm" {
+		return false, nil
+	}
+
+	var username string
+	if err := db.QueryRowContext(r.Context(), `SELECT username FROM users WHERE id=? LIMIT 1`, userID).Scan(&username); err != nil {
+		return false, err
+	}
+
+	canRecover := false
+	for _, part := range strings.Split(roomName, ",") {
+		if strings.TrimSpace(part) == username {
+			canRecover = true
+			break
+		}
+	}
+	if !canRecover {
+		var sentCount int
+		if err := db.QueryRowContext(r.Context(),
+			`SELECT COUNT(*) FROM messages WHERE room_id=? AND sender_id=? LIMIT 1`, roomID, userID,
+		).Scan(&sentCount); err != nil {
+			return false, err
+		}
+		canRecover = sentCount > 0
+	}
+	if !canRecover {
+		return false, nil
+	}
+
+	if _, err := db.ExecContext(r.Context(),
+		`INSERT IGNORE INTO room_members(room_id,user_id) VALUES(?,?)`, roomID, userID,
+	); err != nil {
+		return false, err
+	}
+
+	log.Printf("[room_members] recovered dm membership room=%s user=%s", roomID, userID)
+	return true, nil
 }
 
 func jsonOK(w http.ResponseWriter, v any) {

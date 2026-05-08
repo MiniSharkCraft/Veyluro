@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   useColorScheme,
   View,
+  Image,
 } from 'react-native'
 import { router } from 'expo-router'
 import {
@@ -51,14 +52,25 @@ function getRoomDisplayName(room: RoomType, myUsername: string) {
 function RoomAvatar({
   name,
   type,
+  src,
   theme,
   size = 56,
 }: {
   name: string
   type: RoomType['type']
+  src?: string
   theme: AppTheme
   size?: number
 }) {
+  if (src) {
+    return (
+      <Image
+        source={{ uri: src, cache: 'force-cache' }}
+        style={[s.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: '#0B1020' }]}
+        resizeMode="cover"
+      />
+    )
+  }
   const bg = type === 'group' ? theme.accent : avatarBg(name)
   const fg = '#FFFFFF'
 
@@ -238,7 +250,7 @@ export default function ChatsScreen() {
               onPress={() => router.push(`/(app)/room/${item.id}` as any)}
               activeOpacity={0.72}
             >
-              <RoomAvatar name={displayName} type={item.type} theme={theme} />
+              <RoomAvatar name={displayName} type={item.type} src={item.avatarThumbUrl || item.avatarUrl} theme={theme} />
               <View style={styles.rowInfo}>
                 <View style={styles.rowTop}>
                   <Text style={styles.rowName} numberOfLines={1}>

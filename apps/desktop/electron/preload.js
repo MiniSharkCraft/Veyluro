@@ -14,5 +14,5 @@ contextBridge.exposeInMainWorld('electron', {
   platform: process.platform,
 
   /** App version */
-  version: process.env.npm_package_version ?? '0.1.0',
+  version: process.env.npm_package_version ?? '1.3.2',
 })

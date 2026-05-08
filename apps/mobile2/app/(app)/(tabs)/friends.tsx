@@ -24,7 +24,7 @@ const avatarBg = (name: string) => COLORS[(name?.charCodeAt(0) ?? 0) % COLORS.le
 
 function Avatar({ user }: { user: { username: string; avatarThumbUrl?: string; avatarUrl?: string } }) {
   const src = user.avatarThumbUrl || user.avatarUrl
-  if (src) return <Image source={{ uri: src }} style={s.avatarImg} />
+  if (src) return <Image source={{ uri: src, cache: 'force-cache' }} style={s.avatarImg} />
   return (
     <View style={[s.avatar, { backgroundColor: avatarBg(user.username) }]}>
       <Text style={s.avatarTxt}>{user.username[0].toUpperCase()}</Text>

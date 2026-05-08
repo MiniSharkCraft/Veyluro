@@ -295,7 +295,7 @@ export default function SettingsScreen() {
         <View style={s.profileCard}>
           <TouchableOpacity style={s.avatarPress} onPress={handlePickAvatar} activeOpacity={0.82}>
             {profile?.avatarUrl ? (
-              <Image source={{ uri: profile.avatarThumbUrl || profile.avatarUrl }} style={s.bigAvatarImg} />
+              <Image source={{ uri: profile.avatarThumbUrl || profile.avatarUrl, cache: 'force-cache' }} style={s.bigAvatarImg} />
             ) : (
               <View style={[s.bigAvatar, { backgroundColor: '#1E1B4B' }]}>
                 <Text style={s.bigAvatarTxt}>{(profile?.displayName ?? profile?.username ?? '?')[0]?.toUpperCase()}</Text>

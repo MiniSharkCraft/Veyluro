@@ -3,6 +3,7 @@ package config
 import (
 	"bufio"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -63,6 +64,11 @@ type Config struct {
 	R2SecretAccessKey  string   // Cloudflare R2 S3 secret
 	R2Bucket           string   // Bucket name
 	R2PublicBaseURL    string   // Public/custom domain base URL for objects
+	R2WarnBytes        int64    // soft warning threshold for bucket usage
+	R2BlockBytes       int64    // hard block threshold for new uploads
+	R2UsageSeedBytes   int64    // bootstrap estimated usage bytes (manual from dashboard)
+	RedisURL           string   // redis://user:pass@host:6379/0
+	RedisPrefix        string   // key prefix for distributed rate limit
 	FacebookAppID      string   // App ID để verify token
 	SMTPHost           string   // VD: mail.yourdomain.com
 	SMTPPort           string   // 587 hoặc 465
@@ -95,6 +101,11 @@ func Load() *Config {
 		R2SecretAccessKey:  getEnv("R2_SECRET_ACCESS_KEY", ""),
 		R2Bucket:           getEnv("R2_BUCKET", ""),
 		R2PublicBaseURL:    strings.TrimRight(getEnv("R2_PUBLIC_BASE_URL", ""), "/"),
+		R2WarnBytes:        getEnvInt64("R2_WARN_BYTES", 6*1024*1024*1024),
+		R2BlockBytes:       getEnvInt64("R2_BLOCK_BYTES", 7*1024*1024*1024),
+		R2UsageSeedBytes:   getEnvInt64("R2_USAGE_SEED_BYTES", 0),
+		RedisURL:           getEnv("REDIS_URL", ""),
+		RedisPrefix:        getEnv("REDIS_PREFIX", "amoon"),
 		FacebookAppID:      getEnv("FACEBOOK_APP_ID", ""),
 		SMTPHost:           getEnv("SMTP_HOST", ""),
 		SMTPPort:           getEnv("SMTP_PORT", "587"),
@@ -123,6 +134,18 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func getEnvInt64(key string, fallback int64) int64 {
+	v := strings.TrimSpace(os.Getenv(key))
+	if v == "" {
+		return fallback
+	}
+	n, err := strconv.ParseInt(v, 10, 64)
+	if err != nil || n < 0 {
+		return fallback
+	}
+	return n
 }
 
 func mustEnv(key string) string {

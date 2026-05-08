@@ -37,8 +37,13 @@ CREATE TABLE IF NOT EXISTS rooms (
     name           VARCHAR(256) NOT NULL,
     type           ENUM('dm','group') NOT NULL,
     group_admin_id VARCHAR(36),
+    avatar_url     TEXT,
+    avatar_key     TEXT,
     created_at     BIGINT NOT NULL DEFAULT (UNIX_TIMESTAMP())
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE rooms ADD COLUMN avatar_url TEXT;
+ALTER TABLE rooms ADD COLUMN avatar_key TEXT;
 
 CREATE TABLE IF NOT EXISTS room_members (
     room_id   VARCHAR(36) NOT NULL,

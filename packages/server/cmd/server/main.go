@@ -26,6 +26,7 @@ import (
 	"amoon-eclipse/server/internal/notes"
 	"amoon-eclipse/server/internal/pending"
 	"amoon-eclipse/server/internal/r2"
+	"amoon-eclipse/server/internal/redisx"
 	"amoon-eclipse/server/internal/rooms"
 	"amoon-eclipse/server/internal/users"
 	"amoon-eclipse/server/internal/ws"
@@ -59,6 +60,19 @@ func main() {
 	hub := ws.NewHub(db)
 	go hub.Run()
 
+	var redisClient *redisx.Client
+	if cfg.RedisURL != "" {
+		rc, err := redisx.New(cfg.RedisURL)
+		if err != nil {
+			log.Printf("redis disabled: %v", err)
+		} else {
+			redisClient = rc
+			defer redisClient.Close()
+			mw.SetupRedisRateLimit(redisClient, cfg.RedisPrefix)
+			log.Printf("redis enabled for distributed rate-limit")
+		}
+	}
+
 	// Handlers
 	var mailer *email.Sender
 	if cfg.SMTPHost != "" && cfg.SMTPUser != "" {
@@ -83,7 +97,12 @@ func main() {
 		Bucket:          cfg.R2Bucket,
 		PublicBaseURL:   cfg.R2PublicBaseURL,
 	})
-	roomsHandler := rooms.NewHandler(db)
+	if r2Client != nil {
+		r2Client.SetBucketLimits(cfg.R2WarnBytes, cfg.R2BlockBytes)
+		r2Client.SeedUsageBytes(cfg.R2UsageSeedBytes)
+		log.Printf("r2 guard: %s", r2Client.UsageDebug())
+	}
+	roomsHandler := rooms.NewHandler(db, r2Client)
 	msgsHandler := messages.NewHandler(db, hub, r2Client)
 	notesHandler := notes.NewHandler(db)
 	friendsHandler := friends.NewHandler(db)

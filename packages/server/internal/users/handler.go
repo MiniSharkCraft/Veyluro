@@ -281,6 +281,17 @@ func (h *Handler) uploadAvatar(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "avatar tối đa 25MB", http.StatusRequestEntityTooLarge)
 		return
 	}
+	allowed, usage, limit, quotaErr := h.r2.CanUpload(r.Context(), int64(len(data)))
+	if quotaErr != nil {
+		log.Printf("[avatar] quota check failed user=%s err=%v", me, quotaErr)
+		jsonError(w, "quota check failed", http.StatusServiceUnavailable)
+		return
+	}
+	if !allowed {
+		log.Printf("[avatar] blocked by quota user=%s size=%d usage=%d limit=%d", me, len(data), usage, limit)
+		jsonError(w, "bucket gần đầy, tạm khóa upload", http.StatusInsufficientStorage)
+		return
+	}
 
 	contentType, ext, ok := detectAvatarType(data)
 	if !ok {

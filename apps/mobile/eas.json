@@ -19,8 +19,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "http://localhost:8080",
-        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "123456789-abc.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "123456789-android.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "508238156590-8blnr5tj5e537b1010u8aeshdbekhb0r.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "508238156590-jjvnimkhid7vdhf9h4umi9aa98mrqht6.apps.googleusercontent.com"
       }
     },
     "production": {
@@ -30,8 +30,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "http://localhost:8080",
-        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "123456789-abc.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "123456789-android.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "508238156590-8blnr5tj5e537b1010u8aeshdbekhb0r.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "508238156590-jjvnimkhid7vdhf9h4umi9aa98mrqht6.apps.googleusercontent.com"
       }
     }
   },
