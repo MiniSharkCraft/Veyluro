@@ -1,318 +1,212 @@
-# MesSmini
+# AMoon Eclipse
 
+<div align="center">
+
+```text
+ █████╗ ███╗   ███╗ ██████╗  ██████╗ ███╗   ██╗
+██╔══██╗████╗ ████║██╔═══██╗██╔═══██╗████╗  ██║
+███████║██╔████╔██║██║   ██║██║   ██║██╔██╗ ██║
+██╔══██║██║╚██╔╝██║██║   ██║██║   ██║██║╚██╗██║
+██║  ██║██║ ╚═╝ ██║╚██████╔╝╚██████╔╝██║ ╚████║
+╚═╝  ╚═╝╚═╝     ╚═╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═══╝
+         A M O O N   E C L I P S E
 ```
-███╗   ███╗███████╗███████╗███████╗███╗   ███╗██╗███╗   ██╗██╗
-████╗ ████║██╔════╝██╔════╝██╔════╝████╗ ████║██║████╗  ██║██║
-██╔████╔██║█████╗  ███████╗███████╗██╔████╔██║██║██╔██╗ ██║██║
-██║╚██╔╝██║██╔══╝  ╚════██║╚════██║██║╚██╔╝██║██║██║╚██╗██║██║
-██║ ╚═╝ ██║███████╗███████║███████║██║ ╚═╝ ██║██║██║ ╚████║██║
-╚═╝     ╚═╝╚══════╝╚══════╝╚══════╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝
-```
 
-> **"Vắt kiệt công nghệ"** — CongMC Dev Team 🐧☝️
+**End-to-End Encrypted Messenger - Web · Mobile · Desktop**
 
-A zero-knowledge, end-to-end encrypted multi-platform messenger.
-Built on the Cloudflare Free Tier. Runs everywhere. Costs nearly nothing.
+[![Go](https://img.shields.io/badge/Go-1.23-00ADD8?logo=go)](https://go.dev)
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react)](https://react.dev)
+[![Expo](https://img.shields.io/badge/Expo-51-000020?logo=expo)](https://expo.dev)
+[![Wails](https://img.shields.io/badge/Wails-v2-ff6b6b)](https://wails.io)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+
+</div>
 
 ---
 
-## Philosophy
+## What Is AMoon Eclipse?
 
-> The server is dumb. The client is smart. The key never leaves your device.
+AMoon Eclipse is a **zero-knowledge, end-to-end encrypted** messenger built as a monorepo for web, mobile, and desktop.
+The server stores encrypted bundles and delivery metadata, but it does not hold the private keys used to decrypt messages.
 
-MesSmini is built around one constraint: **the server is zero-knowledge**.
-Every message is encrypted before it leaves the sender's device.
-The Cloudflare Worker stores and relays ciphertext it cannot read.
-Your private key lives in **IndexedDB** (Web/Desktop) or **SecureStore** (Android/iOS) — never on a server, never in a database, never in transit.
+- **Web** - React 18 + Vite
+- **Mobile** - React Native + Expo
+- **Desktop** - Wails v2
+- **Backend** - Go + Chi + MySQL/MariaDB + WebSocket hub
 
-This is not a feature. This is the architecture.
+Messages are encrypted on the client with **AES-256-GCM**. The per-message session key is wrapped per recipient using **RSA-2048-OAEP**. Private keys stay on the client device.
 
 ---
 
-## Tech Stack
+## Current State
 
-### The Ecosystem
+- `apps/mobile2` is the main mobile target
+- `apps/mobile` remains as a legacy client for compatibility
+- avatar uploads go to Cloudflare R2
+- shared crypto lives under `packages/common`
+- server API and realtime delivery live under `packages/server`
 
-| Layer | Technology |
-|---|---|
-| **Web** | React 18 + Vite 5 + Tailwind CSS (Cyberpunk theme) |
-| **Mobile** | React Native + Expo Go + NativeWind |
-| **Desktop** | Electron (wraps the Web build) |
-| **Backend** | Cloudflare Workers + Hono v4 + Durable Objects (WebSocket) |
-| **Database** | Cloudflare D1 (SQLite at the edge) |
-| **Storage** | Cloudflare R2 (7-day auto-delete lifecycle) |
-| **Rate Limit** | KV-backed sliding-window (60 req/min/IP) |
+---
 
-### Core Crypto — Shared Across All Platforms
+## Security Architecture
 
+```text
+┌──────────────────────────────────────────────────┐
+│                  SENDER DEVICE                   │
+│                                                  │
+│  plaintext -> AES-256-GCM -> ciphertext          │
+│                      ^                           │
+│           ephemeral session key (random)         │
+│                      │                           │
+│      RSA-OAEP wrap x N recipients                │
+│      sessionKeys = { userId: encryptedKey, ... } │
+└─────────────────────┬────────────────────────────┘
+                      │  { sessionKeys, payload }
+                      ▼
+┌──────────────────────────────────────────────────┐
+│               GO SERVER (BLIND)                  │
+│                                                  │
+│  Stores encrypted bundles and metadata.          │
+│  Forwards via WebSocket hub.                     │
+│  Cannot read message plaintext.                  │
+└─────────────────────┬────────────────────────────┘
+                      │  same bundle
+                      ▼
+┌──────────────────────────────────────────────────┐
+│                RECIPIENT DEVICE                  │
+│                                                  │
+│  sessionKeys[myId] -> RSA-OAEP unwrap            │
+│                              ▼                   │
+│             session key -> AES-256-GCM decrypt   │
+│                              ▼                   │
+│                        plaintext                 │
+└──────────────────────────────────────────────────┘
 ```
-packages/common/src/crypto-engine.ts
-```
 
-| Algorithm | Use |
-|---|---|
-| **AES-256-GCM** | Message encryption (ephemeral session key per message) |
-| **RSA-2048-OAEP** | Session key encapsulation (per recipient) |
-| **SHA-256** | Key fingerprint for out-of-band verification |
-| **Web Crypto API** | Native on Web/Desktop — polyfilled by `expo-standard-web-crypto` on React Native |
+### Key Storage
 
-The same `encryptMessage()` / `decryptMessage()` functions run on all three platforms with **zero platform branching**. The polyfill handles the rest.
+| Platform | Storage | Backed by |
+|----------|---------|-----------|
+| Web | IndexedDB (`idb`) | Browser origin |
+| Desktop | IndexedDB | WebView storage |
+| Mobile | `expo-secure-store` | Android Keystore / iOS Keychain |
 
 ---
 
 ## Monorepo Structure
 
-```
-messmini/
+```text
+amoon-eclipse/
 ├── apps/
-│   ├── web/                    # React + Vite + Tailwind
-│   │   ├── src/
-│   │   │   ├── components/     # Reusable UI
-│   │   │   ├── pages/          # LoginPage, ChatPage
-│   │   │   ├── hooks/          # useWebSocket, useCrypto
-│   │   │   └── stores/         # Zustand (authStore, chatStore)
-│   │   ├── index.html
-│   │   ├── vite.config.ts
-│   │   └── tailwind.config.ts
-│   │
-│   ├── mobile/                 # React Native + Expo
-│   │   ├── app/
-│   │   │   ├── _layout.tsx     # ← Web Crypto polyfill installed HERE (first import)
-│   │   │   ├── (auth)/
-│   │   │   │   └── login.tsx
-│   │   │   └── (app)/
-│   │   │       ├── index.tsx   # Room list
-│   │   │       └── [roomId].tsx
-│   │   ├── metro.config.js     # Monorepo resolver
-│   │   ├── babel.config.js     # NativeWind + Reanimated
-│   │   ├── app.json
-│   │   └── tailwind.config.js
-│   │
-│   └── desktop/                # Electron wrapper
-│       └── electron/
-│           ├── main.js         # BrowserWindow, shortcuts, notifications
-│           └── preload.js      # contextBridge (IPC bridge)
-│
+│   ├── web/
+│   ├── mobile/
+│   ├── mobile2/
+│   └── desktop/wails-app/
 ├── packages/
-│   ├── common/                 # Shared across ALL platforms
-│   │   └── src/
-│   │       ├── crypto-engine.ts  # ★ Core E2EE — AES-GCM + RSA-OAEP
-│   │       ├── types.ts          # Shared TypeScript interfaces
-│   │       └── index.ts
-│   │
-│   └── server/                 # Cloudflare Workers backend
-│       ├── src/
-│       │   ├── index.ts          # Hono router + ChatRoom Durable Object
-│       │   ├── middleware/
-│       │   │   └── rateLimiter.ts
-│       │   └── routes/
-│       │       ├── auth.ts       # Register, login, public key exchange
-│       │       ├── rooms.ts      # Room CRUD
-│       │       ├── messages.ts   # Paginated ciphertext fetch
-│       │       └── upload.ts     # R2 encrypted attachment upload
-│       ├── schema.sql            # D1 migrations
-│       └── wrangler.toml         # ★ Cloudflare config
-│
+│   ├── common/
+│   └── server/
 ├── docs/
-│   └── EXPO_GO_SETUP.md        # Android fast-test guide
-│
-├── package.json                # pnpm workspaces root
-├── pnpm-workspace.yaml
-├── turbo.json                  # Turborepo build pipeline
-└── tsconfig.base.json          # Shared TS config
+└── scripts/
 ```
 
 ---
 
-## Security Model
+## Features
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        SENDER DEVICE                        │
-│                                                             │
-│  plaintext ──► AES-256-GCM encrypt ──► ciphertext          │
-│                       ▲                                     │
-│              ephemeral session key                          │
-│                       │                                     │
-│        RSA-OAEP wrap (per recipient public key)             │
-│                       │                                     │
-│              encrypted session keys                         │
-└────────────────────────┬────────────────────────────────────┘
-                         │  MessageBundle (JSON)
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    CLOUDFLARE WORKER                        │
-│                                                             │
-│   Stores bundle as opaque TEXT in D1.                       │
-│   Relays via WebSocket (Durable Object).                    │
-│   NEVER decrypts. NEVER has private keys.                   │
-│   Zero-Knowledge by design.                                 │
-└────────────────────────┬────────────────────────────────────┘
-                         │  MessageBundle (same JSON)
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│                     RECIPIENT DEVICE                        │
-│                                                             │
-│  encrypted session key ──► RSA-OAEP unwrap (private key)   │
-│                                  ▼                          │
-│              session key ──► AES-256-GCM decrypt            │
-│                                  ▼                          │
-│                           plaintext ✓                       │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Key Storage
-
-| Platform | Storage | Notes |
-|---|---|---|
-| Web | IndexedDB (idb) | Browser origin-scoped |
-| Desktop | IndexedDB (Electron) | Same as Web — Electron uses Chromium's storage |
-| Mobile | `expo-secure-store` | Android Keystore / iOS Keychain |
+| Feature | Status |
+|---------|--------|
+| End-to-end encrypted DM | ✅ |
+| End-to-end encrypted group chat | ✅ |
+| Realtime WebSocket delivery | ✅ |
+| Friend system | ✅ |
+| Pending messages | ✅ |
+| Notes / ephemeral content | ✅ |
+| Google OAuth | ✅ |
+| TOTP 2FA | ✅ |
+| Passphrase key recovery | ✅ |
+| User blocking | ✅ |
+| Admin moderation tools | ✅ |
+| Avatar upload to R2 | ✅ |
+| Web client | ✅ |
+| Mobile clients | ✅ |
+| Desktop client | ✅ |
 
 ---
 
-## Cloudflare Free Tier Strategy
+## Build And Run
 
-| Resource | Free Limit | MesSmini Usage |
-|---|---|---|
-| Workers | 100k req/day | Rate limited at 60 req/min/IP |
-| D1 | 5M rows read/day | Paginated queries, indexed |
-| R2 | 10 GB storage | 7-day lifecycle auto-delete |
-| R2 Class A ops | 1M/month | Upload-only endpoint |
-| R2 Class B ops | 10M/month | Download-only endpoint |
-| Durable Objects | 100k req/day | One DO per chat room |
-| KV | 100k reads/day | Rate limiter counters (TTL 60s) |
+Requirements:
 
-**R2 Lifecycle Policy** (set in Dashboard → R2 → messmini-attachments → Lifecycle):
-→ Expire objects after **7 days** → removes stale attachments automatically → stays within free storage.
+- Node.js 20+
+- pnpm 9+
+- Go 1.23+
+- MySQL 8+ or MariaDB 10.6+
 
----
-
-## Quick Start
-
-### 1. Clone & Install
+Common commands:
 
 ```bash
-git clone https://github.com/CongMC-Dev/messmini
-cd messmini
 pnpm install
+npm run dev:web
+npm run dev:mobile
+cd apps/mobile2 && npx expo start
+cd apps/mobile2 && npm run build:apk
+cd apps/desktop/wails-app && wails build
+cd packages/server && go run ./cmd/server
 ```
 
-### 2. Provision Cloudflare Resources
-
-```bash
-cd packages/server
-
-# Create D1 database
-wrangler d1 create messmini-db
-# Copy the database_id into wrangler.toml
-
-# Create R2 bucket
-wrangler r2 bucket create messmini-attachments
-
-# Create KV namespace
-wrangler kv namespace create RATE_LIMIT_KV
-# Copy the id into wrangler.toml
-
-# Set secrets
-wrangler secret put JWT_SECRET
-wrangler secret put ALLOWED_ORIGINS   # e.g., https://messmini.pages.dev
-
-# Run DB migrations
-wrangler d1 execute messmini-db --file=./schema.sql
-```
-
-### 3. Deploy Backend
-
-```bash
-pnpm --filter @messmini/server deploy
-```
-
-### 4. Run Web
-
-```bash
-# Update VITE_API_URL in apps/web/.env.local
-echo "VITE_API_URL=https://messmini-server.YOUR.workers.dev" > apps/web/.env.local
-
-pnpm dev:web
-# → http://localhost:3000
-```
-
-### 5. Run Mobile (Expo Go)
-
-See [`docs/EXPO_GO_SETUP.md`](docs/EXPO_GO_SETUP.md) for the full guide.
-
-```bash
-pnpm dev:mobile   # starts Expo → scan QR → runs on phone in 30s
-```
-
-### 6. Run Desktop
-
-```bash
-pnpm dev:desktop  # Starts Vite dev server + Electron simultaneously
-```
+For release builds, rebuild the server binary and regenerate the mobile APK after any API, crypto, or asset change.
 
 ---
 
-## Development Commands
+## Configuration
 
-```bash
-# All apps in parallel (requires Turborepo)
-pnpm build
+See:
 
-# Individual
-pnpm dev:web
-pnpm dev:mobile
-pnpm dev:desktop
-pnpm dev:server
+- [`packages/server/.env.example`](packages/server/.env.example)
+- [`apps/mobile2/.env.example`](apps/mobile2/.env.example)
 
-# Type check everything
-pnpm type-check
+Typical backend values include:
 
-# Deploy backend
-pnpm --filter @messmini/server deploy
-```
+- `DB_DSN`
+- `JWT_SECRET`
+- `DB_ENCRYPTION_KEY`
+- `DB_HMAC_KEY`
+- `PORT`
+- `ALLOWED_ORIGINS`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `R2_ACCOUNT_ID`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+- `R2_BUCKET`
+- `R2_PUBLIC_BASE_URL`
 
----
-
-## Cyberpunk Design System
-
-All platforms share the same visual language:
-
-| Token | Value | Usage |
-|---|---|---|
-| `neon-cyan` | `#00FFFF` | Primary UI, borders, text |
-| `neon-magenta` | `#FF00FF` | Accents, mode indicators |
-| `neon-green` | `#39FF14` | Success, online status |
-| `neon-yellow` | `#FFE600` | Warnings |
-| `dark-900` | `#050508` | Background |
-| `dark-800` | `#0D0D14` | Panels |
-| Font | JetBrains Mono | All text, all platforms |
-
-**Web/Desktop**: Tailwind CSS with custom cyberpunk utilities (`.cyber-panel`, `.cyber-input`, `.cyber-btn`, `.scan-overlay`)
-
-**Mobile**: NativeWind v4 with the same Tailwind config — same class names, native rendering.
+Do not commit local `.env` files or deployment secrets.
 
 ---
 
-## Roadmap
+## Deployment
 
-- [ ] Message search (client-side, decrypted in memory)
-- [ ] File attachments (encrypted R2 upload)
-- [ ] Group rooms (multi-recipient key wrapping — already supported in `encryptMessage()`)
-- [ ] Push notifications (Expo + FCM)
-- [ ] Desktop: system tray + unread badge
-- [ ] Self-destructing messages (TTL in D1)
-- [ ] Key rotation
-- [ ] Wails alternative for Desktop (Go binary, lighter than Electron)
+- Keep backend secrets on the server or panel only
+- Use the public API URL in mobile and desktop runtime config
+- Enable Cloudflare image transformations if you want avatar thumbnails
+- Rebuild the Android APK and Wails binary after release-side changes
 
 ---
 
-## License
+## Documentation
 
-MIT — CongMC Dev Team
+- [Changelog](CHANGELOG.md)
+- [Terms of Service](TERMS.md)
+- [Privacy Policy](PRIVACY.md)
+- [Security Policy](SECURITY.md)
 
 ---
 
-*Built with the philosophy that free tiers are not limitations — they are constraints that force elegant engineering.*
-*Every byte optimized. Every API call justified. The Cloudflare stack, fully vắt kiệt.* 🐧☝️
+## Contributing
+
+Pull requests are welcome.
+
+Before changing shared crypto or message formats, check the cross-platform impact carefully. The shared logic under `packages/common` must stay compatible across web, mobile, and desktop.
+
+Also read [`AGENTS.md`](./AGENTS.md) before contributing.
