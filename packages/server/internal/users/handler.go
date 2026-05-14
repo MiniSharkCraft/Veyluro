@@ -51,15 +51,16 @@ func (h *Handler) Routes() chi.Router {
 }
 
 type userResp struct {
-	ID          string `json:"id"`
-	Username    string `json:"username"`
-	DisplayName string `json:"displayName,omitempty"`
-	Bio         string `json:"bio,omitempty"`
-	AvatarURL   string `json:"avatarUrl,omitempty"`
-	AvatarThumb string `json:"avatarThumbUrl,omitempty"`
-	PublicKey   string `json:"publicKey,omitempty"`
-	TOTPEnabled bool   `json:"totpEnabled"`
-	IsAdmin     bool   `json:"isAdmin"`
+	ID           string `json:"id"`
+	Username     string `json:"username"`
+	DisplayName  string `json:"displayName,omitempty"`
+	Bio          string `json:"bio,omitempty"`
+	AvatarURL    string `json:"avatarUrl,omitempty"`
+	AvatarThumb  string `json:"avatarThumbUrl,omitempty"`
+	PublicKey    string `json:"publicKey,omitempty"`
+	SignalBundle string `json:"signalBundle,omitempty"`
+	TOTPEnabled  bool   `json:"totpEnabled"`
+	IsAdmin      bool   `json:"isAdmin"`
 }
 
 // GET /api/users/search?q=prefix
@@ -71,7 +72,7 @@ func (h *Handler) search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rows, err := h.db.QueryContext(r.Context(), `
-		SELECT id, username, COALESCE(display_name,''), COALESCE(public_key,''), COALESCE(avatar_url,''), COALESCE(avatar_key,'')
+		SELECT id, username, COALESCE(display_name,''), COALESCE(public_key,''), COALESCE(signal_bundle,''), COALESCE(avatar_url,''), COALESCE(avatar_key,'')
 		FROM users
 		WHERE username LIKE ? AND id != ?
 		LIMIT 20
@@ -85,7 +86,7 @@ func (h *Handler) search(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var u userResp
 		var avatarKey string
-		rows.Scan(&u.ID, &u.Username, &u.DisplayName, &u.PublicKey, &u.AvatarURL, &avatarKey)
+		rows.Scan(&u.ID, &u.Username, &u.DisplayName, &u.PublicKey, &u.SignalBundle, &u.AvatarURL, &avatarKey)
 		h.decorateAvatar(&u, avatarKey)
 		list = append(list, u)
 	}
@@ -103,9 +104,9 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 	var totpEnabled, isAdmin int
 	err := h.db.QueryRowContext(r.Context(), `
 		SELECT id, username, COALESCE(display_name,''), COALESCE(bio,''),
-		       COALESCE(avatar_url,''), COALESCE(avatar_key,''), COALESCE(public_key,''), COALESCE(totp_enabled,0), COALESCE(is_admin,0)
+		       COALESCE(avatar_url,''), COALESCE(avatar_key,''), COALESCE(public_key,''), COALESCE(signal_bundle,''), COALESCE(totp_enabled,0), COALESCE(is_admin,0)
 		FROM users WHERE id=?
-	`, me).Scan(&u.ID, &u.Username, &u.DisplayName, &u.Bio, &u.AvatarURL, &avatarKey, &u.PublicKey, &totpEnabled, &isAdmin)
+	`, me).Scan(&u.ID, &u.Username, &u.DisplayName, &u.Bio, &u.AvatarURL, &avatarKey, &u.PublicKey, &u.SignalBundle, &totpEnabled, &isAdmin)
 	if err != nil {
 		jsonError(w, "not found", http.StatusNotFound)
 		return
@@ -172,7 +173,12 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 
 	resp := map[string]string{"status": "ok"}
 	if updatedUsername != "" {
-		token, err := auth.SignJWT(me, updatedUsername, h.jwtSecret)
+		tokenVersion, err := auth.CurrentTokenVersion(r.Context(), h.db, me)
+		if err != nil {
+			jsonError(w, "db error", http.StatusInternalServerError)
+			return
+		}
+		token, err := auth.SignJWT(me, updatedUsername, h.jwtSecret, tokenVersion)
 		if err != nil {
 			jsonError(w, "token error", http.StatusInternalServerError)
 			return

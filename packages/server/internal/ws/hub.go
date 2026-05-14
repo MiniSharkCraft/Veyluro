@@ -297,8 +297,16 @@ func (c *Client) readPump() {
 			// Override fromUserId với server-verified user ID
 			fromJSON, _ := json.Marshal(c.userID)
 			raw["fromUserId"] = fromJSON
+			if _, ok := raw["roomId"]; !ok && c.roomID != "" {
+				roomJSON, _ := json.Marshal(c.roomID)
+				raw["roomId"] = roomJSON
+			}
 			out, _ := json.Marshal(raw)
-			c.hub.SendToUserInRoom(toUserID, c.roomID, out)
+			delivered := c.hub.SendToUserInRoom(toUserID, c.roomID, out)
+			// Ring/end events should still reach target when they are not bound to room socket.
+			if !delivered && (frame.Type == "call-ring" || frame.Type == "call-end") {
+				c.hub.SendToUserGlobal(toUserID, out)
+			}
 			continue
 		}
 
@@ -317,6 +325,9 @@ func (c *Client) readPump() {
 			sf.FromUser = c.userID
 			out, _ := json.Marshal(sf)
 			c.hub.broadcast <- &roomMsg{roomID: c.roomID, data: out, from: c}
+			if frame.Type == "group-call-invite" {
+				c.hub.BroadcastToRoomMemberGlobals(c.roomID, out)
+			}
 			continue
 		}
 

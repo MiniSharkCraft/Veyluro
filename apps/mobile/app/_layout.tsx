@@ -1,49 +1,37 @@
-/**
- * @file _layout.tsx
- * @description Root layout — MUST install Web Crypto polyfill FIRST before
- * any @messmini/common import that calls SubtleCrypto.
- *
- * expo-standard-web-crypto patches globalThis.crypto so our crypto-engine.ts
- * runs identically to Web/Desktop with zero code changes.
- */
-
-// ① Polyfill Web Crypto API — must be first import
-import 'expo-standard-web-crypto'
+// ① Polyfill Web Crypto API (full SubtleCrypto) — must be FIRST import
+import '../src/lib/text-decoder-polyfill'
+import { install } from 'react-native-quick-crypto'
+install()
 
 import { useEffect } from 'react'
+import { useColorScheme } from 'react-native'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import * as SplashScreen from 'expo-splash-screen'
-import * as Font from 'expo-font'
+import { getTheme } from '../src/lib/theme'
+import { ensureNotificationsReady } from '../src/lib/notifications'
 
 SplashScreen.preventAutoHideAsync()
 
 export default function RootLayout() {
+  const scheme = useColorScheme()
+  const theme = getTheme(scheme)
+
   useEffect(() => {
-    const prepare = async () => {
-      try {
-        await Font.loadAsync({
-          'JetBrainsMono': require('../assets/fonts/JetBrainsMono-Regular.ttf'),
-          'JetBrainsMono-Bold': require('../assets/fonts/JetBrainsMono-Bold.ttf'),
-        })
-      } catch (e) {
-        console.warn('Font load failed, falling back to system mono:', e)
-      } finally {
-        await SplashScreen.hideAsync()
-      }
-    }
-    prepare()
+    ensureNotificationsReady().catch((err) => {
+      console.warn('[notify] init failed:', err)
+    })
+    SplashScreen.hideAsync()
   }, [])
 
   return (
     <>
-      <StatusBar style="light" backgroundColor="#050508" />
+      <StatusBar style={scheme === 'light' ? 'dark' : 'light'} backgroundColor={theme.bg} />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: '#0D0D14' },
-          headerTintColor: '#00FFFF',
-          headerTitleStyle: { fontFamily: 'JetBrainsMono', fontSize: 14 },
-          contentStyle: { backgroundColor: '#050508' },
+          headerStyle: { backgroundColor: theme.bg },
+          headerTintColor: theme.text,
+          contentStyle: { backgroundColor: theme.bg },
           animation: 'fade',
         }}
       >

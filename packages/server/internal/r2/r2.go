@@ -133,6 +133,36 @@ func (c *Client) DeleteObject(ctx context.Context, key string) error {
 	return nil
 }
 
+func (c *Client) GetObject(ctx context.Context, key string) (io.ReadCloser, string, int64, error) {
+	if c == nil {
+		return nil, "", 0, fmt.Errorf("r2 chưa cấu hình")
+	}
+	req, err := c.signedRequest(ctx, http.MethodGet, key, "", nil)
+	if err != nil {
+		return nil, "", 0, err
+	}
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, "", 0, err
+	}
+	if res.StatusCode == http.StatusNotFound {
+		res.Body.Close()
+		return nil, "", 0, fmt.Errorf("object not found")
+	}
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		msg, _ := io.ReadAll(io.LimitReader(res.Body, 2048))
+		res.Body.Close()
+		return nil, "", 0, fmt.Errorf("r2 get failed: %s %s", res.Status, strings.TrimSpace(string(msg)))
+	}
+	size := int64(-1)
+	if cl := strings.TrimSpace(res.Header.Get("Content-Length")); cl != "" {
+		if parsed, parseErr := strconv.ParseInt(cl, 10, 64); parseErr == nil {
+			size = parsed
+		}
+	}
+	return res.Body, strings.TrimSpace(res.Header.Get("Content-Type")), size, nil
+}
+
 func (c *Client) CanUpload(ctx context.Context, incomingBytes int64) (bool, int64, int64, error) {
 	_ = ctx
 	if c == nil {

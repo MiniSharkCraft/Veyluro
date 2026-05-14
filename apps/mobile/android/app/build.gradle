@@ -80,6 +80,18 @@ def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBu
  * this variant is about 6MiB larger per architecture than default.
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
+// Release signing must be provided from local environment or local gradle.properties.
+// Required vars:
+// - AMOON_RELEASE_STORE_FILE
+// - AMOON_RELEASE_STORE_PASSWORD
+// - AMOON_RELEASE_KEY_ALIAS
+// - AMOON_RELEASE_KEY_PASSWORD
+def releaseStoreFile = findProperty('AMOON_RELEASE_STORE_FILE') ?: System.getenv('AMOON_RELEASE_STORE_FILE')
+def releaseStorePassword = findProperty('AMOON_RELEASE_STORE_PASSWORD') ?: System.getenv('AMOON_RELEASE_STORE_PASSWORD')
+def releaseKeyAlias = findProperty('AMOON_RELEASE_KEY_ALIAS') ?: System.getenv('AMOON_RELEASE_KEY_ALIAS')
+def releaseKeyPassword = findProperty('AMOON_RELEASE_KEY_PASSWORD') ?: System.getenv('AMOON_RELEASE_KEY_PASSWORD')
+def hasReleaseSigningConfig = releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword
+def wantsReleaseBuild = gradle.startParameter.taskNames.any { it.toLowerCase().contains("release") }
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -87,13 +99,13 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'dev.congmc.amoon'
+    namespace 'com.amoon.eclipse'
     defaultConfig {
-        applicationId 'dev.congmc.amoon'
+        applicationId 'com.amoon.eclipse'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "0.1.0"
+        versionName "1.3.2"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
@@ -104,15 +116,29 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            if (hasReleaseSigningConfig) {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            if (!hasReleaseSigningConfig && wantsReleaseBuild) {
+                throw new GradleException(
+                    "Release signing is not configured. Set AMOON_RELEASE_STORE_FILE, AMOON_RELEASE_STORE_PASSWORD, " +
+                    "AMOON_RELEASE_KEY_ALIAS, AMOON_RELEASE_KEY_PASSWORD in gradle.properties (local) or environment."
+                )
+            }
+            if (hasReleaseSigningConfig) {
+                signingConfig signingConfigs.release
+            }
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds

@@ -13,7 +13,8 @@
   },
   "scripts": {
     "dev:web": "npm run dev --workspace=apps/web",
-    "dev:mobile": "cd apps/mobile && node ../../node_modules/.bin/expo start",
+    "dev:mobile": "npm run start --workspace=apps/mobile",
+    "dev:mobile:legacy": "npm run start --workspace=apps/mobile-legacy",
     "setup:server": "./scripts/setup-server.sh",
     "setup:app": "./scripts/setup-app.sh",
     "build": "npm run --workspaces --if-present build",

@@ -318,6 +318,7 @@ type memberResp struct {
 	AvatarThumb string `json:"avatarThumbUrl,omitempty"`
 	PublicKey   string `json:"publicKey,omitempty"`
 	Fingerprint string `json:"fingerprint,omitempty"`
+	SignalBundle string `json:"signalBundle,omitempty"`
 }
 
 func (h *Handler) members(w http.ResponseWriter, r *http.Request) {
@@ -334,7 +335,7 @@ func (h *Handler) members(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := h.db.QueryContext(r.Context(), `
-		SELECT u.id, u.username, COALESCE(u.avatar_url,''), COALESCE(u.avatar_key,''), COALESCE(u.public_key,''), COALESCE(u.fingerprint,'')
+		SELECT u.id, u.username, COALESCE(u.avatar_url,''), COALESCE(u.avatar_key,''), COALESCE(u.public_key,''), COALESCE(u.fingerprint,''), COALESCE(u.signal_bundle,'')
 		FROM users u
 		JOIN room_members rm ON rm.user_id = u.id
 		WHERE rm.room_id = ?
@@ -349,7 +350,7 @@ func (h *Handler) members(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var m memberResp
 		var avatarKey string
-		rows.Scan(&m.ID, &m.Username, &m.AvatarURL, &avatarKey, &m.PublicKey, &m.Fingerprint)
+		rows.Scan(&m.ID, &m.Username, &m.AvatarURL, &avatarKey, &m.PublicKey, &m.Fingerprint, &m.SignalBundle)
 		m.AvatarThumb = h.avatarThumbURL(avatarKey, m.AvatarURL)
 		members = append(members, m)
 	}

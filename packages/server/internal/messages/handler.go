@@ -7,6 +7,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -40,6 +42,7 @@ func NewHandler(db *sql.DB, hub Hub, r2Client *r2.Client) *Handler {
 func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Post("/{roomId}/attachments", h.uploadAttachment)
+	r.Get("/{roomId}/attachments/object", h.getAttachment)
 	r.Get("/{roomId}", h.list)
 	r.Post("/{roomId}", h.send)
 	return r
@@ -112,13 +115,16 @@ type sendReq struct {
 }
 
 type attachmentResp struct {
-	Kind     string `json:"kind"`
-	URL      string `json:"url"`
-	ThumbURL string `json:"thumbUrl,omitempty"`
-	Key      string `json:"key"`
-	Mime     string `json:"mime"`
-	Size     int64  `json:"size"`
-	Name     string `json:"name,omitempty"`
+	Kind         string `json:"kind"`
+	URL          string `json:"url"`
+	ThumbURL     string `json:"thumbUrl,omitempty"`
+	Key          string `json:"key"`
+	Mime         string `json:"mime"`
+	Size         int64  `json:"size"`
+	Name         string `json:"name,omitempty"`
+	Encrypted    bool   `json:"encrypted,omitempty"`
+	OriginalMime string `json:"originalMime,omitempty"`
+	OriginalName string `json:"originalName,omitempty"`
 }
 
 func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
@@ -228,7 +234,7 @@ func (h *Handler) uploadAttachment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[attachment] upload start user=%s room=%s contentLength=%d contentType=%q", userID, roomID, r.ContentLength, r.Header.Get("Content-Type"))
+	log.Printf("[attachment] upload start user=%s room=%s contentLength=%d", userID, roomID, r.ContentLength)
 	if err := r.ParseMultipartForm(maxImageAttachmentBytes + 1024*1024); err != nil {
 		log.Printf("[attachment] multipart parse failed user=%s room=%s err=%v", userID, roomID, err)
 		jsonError(w, "ảnh quá lớn hoặc multipart không hợp lệ", http.StatusBadRequest)
@@ -272,29 +278,90 @@ func (h *Handler) uploadAttachment(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "bucket gần đầy, tạm khóa upload", http.StatusInsufficientStorage)
 		return
 	}
-	contentType, ext, ok := detectImageAttachmentType(data, header.Header.Get("Content-Type"), header.Filename)
-	if !ok {
-		jsonError(w, "chỉ hỗ trợ JPEG, PNG, WebP hoặc GIF", http.StatusBadRequest)
+	isE2EE := strings.EqualFold(strings.TrimSpace(r.Header.Get("X-AMOON-E2EE")), "1")
+	originalMime := normalizeOriginalMime(r.Header.Get("X-AMOON-ORIGINAL-MIME"))
+	originalName := sanitizeOriginalName(r.Header.Get("X-AMOON-ORIGINAL-NAME"))
+	if originalName == "" {
+		originalName = sanitizeOriginalName(header.Filename)
+	}
+	if !isE2EE {
+		jsonError(w, "plaintext attachment bị chặn: yêu cầu upload E2EE", http.StatusBadRequest)
+		return
+	}
+	if originalMime == "" || originalName == "" {
+		jsonError(w, "thiếu metadata E2EE attachment", http.StatusBadRequest)
 		return
 	}
 
+	ext := inferAttachmentExt(originalName, originalMime)
 	key := fmt.Sprintf("attachments/%s/%s/%s%s", roomID, userID, uuid.NewString(), ext)
-	url, err := h.r2.PutObject(r.Context(), key, contentType, data)
-	if err != nil {
-		log.Printf("[attachment] R2 upload failed user=%s room=%s key=%s type=%s size=%d err=%v", userID, roomID, key, contentType, len(data), err)
+	const encryptedContentType = "application/octet-stream"
+	_, putErr := h.r2.PutObject(r.Context(), key, encryptedContentType, data)
+	if putErr != nil {
+		log.Printf("[attachment] e2ee upload failed user=%s room=%s size=%d err=%v", userID, roomID, len(data), putErr)
 		jsonError(w, "upload R2 thất bại", http.StatusBadGateway)
 		return
 	}
-	log.Printf("[attachment] upload ok user=%s room=%s key=%s type=%s size=%d", userID, roomID, key, contentType, len(data))
+	log.Printf("[attachment] e2ee upload ok user=%s room=%s size=%d", userID, roomID, len(data))
+	proxyURL := attachmentProxyURL(r, roomID, key)
 	jsonOK(w, attachmentResp{
-		Kind:     "image",
-		URL:      url,
-		ThumbURL: h.r2.TransformURL(key, 720, 720),
-		Key:      key,
-		Mime:     contentType,
-		Size:     int64(len(data)),
-		Name:     header.Filename,
+		Kind:         attachmentKindFromMime(originalMime),
+		URL:          proxyURL,
+		Key:          key,
+		Mime:         encryptedContentType,
+		Size:         int64(len(data)),
+		Name:         header.Filename,
+		Encrypted:    true,
+		OriginalMime: originalMime,
+		OriginalName: originalName,
 	})
+}
+
+func (h *Handler) getAttachment(w http.ResponseWriter, r *http.Request) {
+	if h.r2 == nil {
+		jsonError(w, "R2 chưa cấu hình", http.StatusServiceUnavailable)
+		return
+	}
+	userID, _ := r.Context().Value(auth.ContextKeyUserID).(string)
+	roomID := chi.URLParam(r, "roomId")
+	if userID == "" || roomID == "" {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	if !isMember(h.db, r, roomID, userID) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	key := strings.TrimSpace(r.URL.Query().Get("key"))
+	if key == "" {
+		jsonError(w, "missing key", http.StatusBadRequest)
+		return
+	}
+	expectedPrefix := fmt.Sprintf("attachments/%s/", roomID)
+	if strings.Contains(key, "..") || strings.HasPrefix(key, "/") || !strings.HasPrefix(key, expectedPrefix) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	body, contentType, size, err := h.r2.GetObject(r.Context(), key)
+	if err != nil {
+		log.Printf("[attachment] fetch failed user=%s room=%s err=%v", userID, roomID, err)
+		jsonError(w, "attachment not found", http.StatusNotFound)
+		return
+	}
+	defer body.Close()
+
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Cache-Control", "private, no-store")
+	if size > 0 {
+		w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
+	}
+	if _, err := io.Copy(w, body); err != nil {
+		log.Printf("[attachment] stream failed user=%s room=%s err=%v", userID, roomID, err)
+	}
 }
 
 func detectImageAttachmentType(data []byte, declaredType, filename string) (contentType string, ext string, ok bool) {
@@ -319,6 +386,84 @@ func detectImageAttachmentType(data []byte, declaredType, filename string) (cont
 		return declaredType, ".heic", true
 	}
 	return "", "", false
+}
+
+func normalizeOriginalMime(v string) string {
+	mime := strings.ToLower(strings.TrimSpace(strings.Split(v, ";")[0]))
+	if mime == "" {
+		return ""
+	}
+	if len(mime) > 127 {
+		mime = mime[:127]
+	}
+	return mime
+}
+
+func sanitizeOriginalName(v string) string {
+	name := strings.TrimSpace(v)
+	if name == "" {
+		return ""
+	}
+	name = strings.ReplaceAll(name, "\x00", "")
+	name = strings.ReplaceAll(name, "\\", "/")
+	name = filepath.Base(name)
+	if len(name) > 255 {
+		name = name[:255]
+	}
+	return name
+}
+
+func inferAttachmentExt(filename, mime string) string {
+	ext := strings.ToLower(strings.TrimSpace(filepath.Ext(filename)))
+	if ext != "" && len(ext) <= 12 && strings.HasPrefix(ext, ".") {
+		return ext
+	}
+	switch strings.ToLower(strings.TrimSpace(mime)) {
+	case "image/jpeg":
+		return ".jpg"
+	case "image/png":
+		return ".png"
+	case "image/gif":
+		return ".gif"
+	case "image/webp":
+		return ".webp"
+	case "image/heic", "image/heif":
+		return ".heic"
+	case "video/mp4":
+		return ".mp4"
+	case "video/quicktime":
+		return ".mov"
+	case "application/pdf":
+		return ".pdf"
+	case "audio/mpeg":
+		return ".mp3"
+	case "audio/mp4", "audio/aac":
+		return ".m4a"
+	default:
+		return ".bin"
+	}
+}
+
+func attachmentKindFromMime(mime string) string {
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(mime)), "image/") {
+		return "image"
+	}
+	return "file"
+}
+
+func attachmentProxyURL(r *http.Request, roomID, key string) string {
+	scheme := requestScheme(r)
+	return fmt.Sprintf("%s://%s/api/messages/%s/attachments/object?key=%s", scheme, r.Host, url.PathEscape(roomID), url.QueryEscape(key))
+}
+
+func requestScheme(r *http.Request) string {
+	if r.TLS != nil {
+		return "https"
+	}
+	if strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")), "https") {
+		return "https"
+	}
+	return "http"
 }
 
 func isMember(db *sql.DB, r *http.Request, roomID, userID string) bool {

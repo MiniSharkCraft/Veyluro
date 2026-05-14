@@ -71,7 +71,22 @@ function EmptyState({ icon, text, sub }: { icon: string; text: string; sub?: str
 
 function authHdr(token: string) { return { Authorization: `Bearer ${token}` } }
 
-const MAX_IMAGE_BYTES = 50 * 1024 * 1024
+const ATTACHMENT_UPLOAD_UNAVAILABLE_MESSAGE = 'Encrypted attachments are not available on this client yet'
+
+function normalizeEmoticons(input: string): string {
+  return input
+    .replace(/=\)\)/g, '😂')
+    .replace(/:\)\)/g, '😆')
+    .replace(/:'\(/g, '😢')
+    .replace(/;\)/g, '😉')
+    .replace(/:d/gi, '😄')
+    .replace(/:p/gi, '😛')
+    .replace(/:v/gi, '😛')
+    .replace(/:0/gi, '😮')
+    .replace(/:3/g, '😺')
+    .replace(/:\)/g, '🙂')
+    .replace(/:\(/g, '🙁')
+}
 
 function parseMessageText(text: string): { text: string; attachment?: Attachment } {
   try {
@@ -272,7 +287,7 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim() || !active || !privateKey || !userId) return
-    const text = input.trim()
+    const text = normalizeEmoticons(input.trim())
     setInput('')
     setSending(true)
     setSendErr('')
@@ -305,94 +320,9 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
     } finally { setSending(false) }
   }
 
-  const loadRecipients = async () => {
-    if (!active) throw new Error('No active room')
-    let currentMembers = members
-    if (currentMembers.length === 0) {
-      const mRes = await fetch(`${API}/api/rooms/${active.id}/members`, { headers: hdr })
-      if (mRes.ok) { currentMembers = await mRes.json(); setMembers(currentMembers) }
-    }
-    const selfMember = currentMembers.find(m => m.id === userId)
-    const myPublicKey = publicKey || selfMember?.publicKey || ''
-    if (!myPublicKey) throw new Error('Key not loaded yet, please wait a moment')
-
-    const recipients: Array<{id:string;publicKey:string}> = [{ id: userId, publicKey: myPublicKey }]
-    currentMembers
-      .filter(m => m.id !== userId && m.publicKey)
-      .forEach(m => recipients.push({ id: m.id, publicKey: m.publicKey }))
-    if (recipients.length < 2) throw new Error('Cannot find recipient keys')
-    return recipients
-  }
-
-  const uploadImage = async (file: File): Promise<Attachment> => {
-    if (!active) throw new Error('No active room')
-    if (!file.type.startsWith('image/')) throw new Error('Only image files are supported')
-    if (file.size > MAX_IMAGE_BYTES) throw new Error('Image must be 50MB or smaller')
-    const form = new FormData()
-    form.append('image', file, file.name)
-    const res = await fetch(`${API}/api/messages/${active.id}/attachments`, {
-      method: 'POST',
-      headers: hdr,
-      body: form,
-    })
-    if (!res.ok) {
-      const data = await res.json().catch(() => null)
-      throw new Error(data?.error ?? 'Upload image failed')
-    }
-    return res.json()
-  }
-
-  const sendImage = async (file: File) => {
-    if (!active || sendingImage) return
-    setSendingImage(true)
-    setSendErr('')
-    const localUri = URL.createObjectURL(file)
-    const tempId = `image_${Date.now()}`
-    const tempMessage: Message = {
-      id: tempId,
-      senderId: userId,
-      bundle: '',
-      createdAt: Math.floor(Date.now() / 1000),
-      text: '',
-      attachment: {
-        kind: 'image',
-        url: localUri,
-        thumbUrl: localUri,
-        localUri,
-        key: '',
-        mime: file.type || 'image/jpeg',
-        size: file.size,
-        name: file.name,
-      },
-      pending: true,
-    }
-    setMessages(prev => [...prev, tempMessage])
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
-
-    try {
-      const recipients = await loadRecipients()
-      const attachment = await uploadImage(file)
-      const payload = JSON.stringify({ amoonType: 'image', text: '', attachment })
-      const bundle = await encryptMessage(payload, recipients)
-      const res = await fetch(`${API}/api/messages/${active.id}`, {
-        method: 'POST',
-        headers: { ...hdr, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bundle: JSON.stringify(bundle) }),
-      })
-      if (!res.ok) throw new Error('Failed to send image')
-      const data = await res.json().catch(() => null)
-      setMessages(prev => prev.map(m => m.id === tempId
-        ? { ...m, id: data?.id ?? tempId, attachment, pending: false, createdAt: Math.floor(Date.now() / 1000) }
-        : m
-      ))
-    } catch (err) {
-      setSendErr(err instanceof Error ? err.message : 'Image send failed')
-      setMessages(prev => prev.filter(m => m.id !== tempId))
-    } finally {
-      URL.revokeObjectURL(localUri)
-      setSendingImage(false)
-      if (fileRef.current) fileRef.current.value = ''
-    }
+  const sendImage = async (_file: File) => {
+    setSendErr(ATTACHMENT_UPLOAD_UNAVAILABLE_MESSAGE)
+    if (fileRef.current) fileRef.current.value = ''
   }
 
   const roomDisplayName = (r: Room) => {
@@ -750,9 +680,9 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
                 }}
               />
               <button type="button" disabled={sendingImage || sending}
-                onClick={() => fileRef.current?.click()}
+                onClick={() => setSendErr(ATTACHMENT_UPLOAD_UNAVAILABLE_MESSAGE)}
                 className="w-11 h-11 rounded-full bg-[var(--app-panel)] text-[var(--app-text-faint)] flex items-center justify-center hover:bg-[var(--app-brand-soft)] hover:text-[var(--app-brand)] transition-all disabled:opacity-30"
-                title="Send image">
+                title="Encrypted attachments are not available on this client yet">
                 <ImageSquare size={21} weight="bold" />
               </button>
               <input ref={inputRef}
@@ -953,7 +883,7 @@ function PendingTab({ userId, token, privateKey, publicKey, hdr }: {
         { id: userId, publicKey },
         { id: sendRes.id, publicKey: sendRes.publicKey! },
       ]
-      const bundle = await encryptMessage(sendMsg, recipients)
+      const bundle = await encryptMessage(normalizeEmoticons(sendMsg), recipients)
       const res = await fetch(`${API}/api/pending/send/${sendRes.id}`, {
         method: 'POST', headers: { ...hdr, 'Content-Type': 'application/json' },
         body: JSON.stringify({ bundle: JSON.stringify(bundle) }),

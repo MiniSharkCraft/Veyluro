@@ -8,15 +8,17 @@ import (
 )
 
 type Claims struct {
-	UserID   string `json:"uid"`
-	Username string `json:"username"`
+	UserID       string `json:"uid"`
+	Username     string `json:"username"`
+	TokenVersion int    `json:"tv"`
 	jwt.RegisteredClaims
 }
 
-func SignJWT(userID, username, secret string) (string, error) {
+func SignJWT(userID, username, secret string, tokenVersion int) (string, error) {
 	claims := Claims{
-		UserID:   userID,
-		Username: username,
+		UserID:       userID,
+		Username:     username,
+		TokenVersion: tokenVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * 24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

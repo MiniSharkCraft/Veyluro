@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -9,7 +10,7 @@ import (
 	"amoon-eclipse/server/internal/auth"
 )
 
-func Auth(jwtSecret string) func(http.Handler) http.Handler {
+func Auth(db *sql.DB, jwtSecret string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			header := r.Header.Get("Authorization")
@@ -34,6 +35,13 @@ func Auth(jwtSecret string) func(http.Handler) http.Handler {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusUnauthorized)
 				json.NewEncoder(w).Encode(map[string]string{"error": "invalid token"})
+				return
+			}
+			currentVersion, err := auth.CurrentTokenVersion(r.Context(), db, claims.UserID)
+			if err != nil || currentVersion != claims.TokenVersion {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				json.NewEncoder(w).Encode(map[string]string{"error": "token revoked"})
 				return
 			}
 

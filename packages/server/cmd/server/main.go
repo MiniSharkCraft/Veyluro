@@ -172,7 +172,7 @@ func main() {
 
 	// Protected routes
 	r.Group(func(r chi.Router) {
-		r.Use(mw.Auth(cfg.JWTSecret))
+		r.Use(mw.Auth(db, cfg.JWTSecret))
 		r.Use(mw.RateLimitAPI)
 
 		r.Route("/api/rooms", func(r chi.Router) {

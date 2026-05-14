@@ -18,7 +18,7 @@ interface AuthState {
   token:      string | null
   needsKeyRecovery: boolean
 
-  login:           (username: string, password: string) => Promise<void>
+  login:           (username: string, password: string, totpCode?: string) => Promise<void>
   register:        (username: string, email: string, password: string, passphrase: string) => Promise<void>
   loginWithOAuth:  (accessToken: string, passphrase?: string) => Promise<void>
   completeOAuthLogin: (payload: { userId: string; username: string; token: string }, passphrase?: string) => Promise<void>
@@ -137,12 +137,16 @@ export const useAuthStore = create<AuthState>((set) => ({
     saveSession(userId, username, data.token ?? '', created.publicKey)
   },
 
-  login: async (username, password) => {
+  login: async (username, password, totpCode) => {
     const passwordHash = password
     const res = await fetch(`${API}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password: passwordHash }),
+      body: JSON.stringify({
+        username,
+        password: passwordHash,
+        ...(totpCode?.trim() ? { totpCode: totpCode.trim() } : {}),
+      }),
     })
     if (!res.ok) throw new Error((await res.json()).error ?? 'Login failed')
     const data = await res.json()

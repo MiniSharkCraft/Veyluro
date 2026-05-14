@@ -24,7 +24,7 @@ interface AuthState {
   privateKey: CryptoKey | null   // In-memory only, sourced from IndexedDB
   token: string | null
 
-  login: (username: string, password: string) => Promise<void>
+  login: (username: string, password: string, totpCode?: string) => Promise<void>
   register: (username: string, password: string) => Promise<void>
   logout: () => void
   loadKeysFromStorage: () => Promise<void>
@@ -111,12 +111,16 @@ export const useAuthStore = create<AuthState>((set, _get) => ({
     set({ isAuthenticated: true, userId: data.userId, username, publicKey, privateKey: privKey, token: data.token })
   },
 
-  login: async (username, password) => {
+  login: async (username, password, totpCode) => {
     const serverPassword = await hashPassword(password)
     const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password: serverPassword }),
+      body: JSON.stringify({
+        username,
+        password: serverPassword,
+        ...(totpCode?.trim() ? { totpCode: totpCode.trim() } : {}),
+      }),
     })
     if (!res.ok) throw new Error((await res.json()).error)
     const data = await res.json() as AuthPayload

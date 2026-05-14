@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS users (
     username        VARCHAR(64) UNIQUE NOT NULL,
     public_key      TEXT,
     fingerprint     VARCHAR(128),
+    signal_bundle   MEDIUMTEXT,
+    auth_method     VARCHAR(16) NOT NULL DEFAULT 'pin',
     password_hash   TEXT,
     oauth_provider  VARCHAR(32),
     oauth_id        VARCHAR(128),
@@ -16,6 +18,8 @@ CREATE TABLE IF NOT EXISTS users (
     key_salt        TEXT,
     reset_token     TEXT,
     reset_expires   BIGINT,
+    reset_attempts  INT NOT NULL DEFAULT 0,
+    token_version   INT NOT NULL DEFAULT 0,
     totp_secret     TEXT,
     totp_enabled    TINYINT DEFAULT 0,
     display_name    VARCHAR(128),
@@ -28,6 +32,10 @@ CREATE TABLE IF NOT EXISTS users (
 
 ALTER TABLE users ADD COLUMN avatar_url TEXT;
 ALTER TABLE users ADD COLUMN avatar_key TEXT;
+ALTER TABLE users ADD COLUMN signal_bundle MEDIUMTEXT;
+ALTER TABLE users ADD COLUMN auth_method VARCHAR(16) NOT NULL DEFAULT 'pin';
+ALTER TABLE users ADD COLUMN reset_attempts INT NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN token_version INT NOT NULL DEFAULT 0;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth       ON users(oauth_provider, oauth_id);
 CREATE INDEX        IF NOT EXISTS idx_users_email_token ON users(email_token);

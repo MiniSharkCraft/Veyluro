@@ -11,5 +11,7 @@
     "type-check": "tsc --noEmit"
   },
   "devDependencies": {},
-  "dependencies": {}
+  "dependencies": {
+    "expo-crypto": "~15.0.9"
+  }
 }

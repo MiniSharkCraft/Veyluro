@@ -18,6 +18,7 @@ export function LoginPage() {
   const [username,          setUsername]          = useState('')
   const [email,             setEmail]             = useState('')
   const [password,          setPassword]          = useState('')
+  const [totpCode,          setTotpCode]          = useState('')
   const [passphrase,        setPassphrase]        = useState('')
   const [confirmPassphrase, setConfirmPassphrase] = useState('')
 
@@ -56,7 +57,7 @@ export function LoginPage() {
         if (passphrase !== confirmPassphrase) throw new Error('Passphrases do not match')
         await register(username, email, password, passphrase)
       } else {
-        await login(username, password)
+        await login(username, password, totpCode)
       }
     })
   }
@@ -211,6 +212,17 @@ export function LoginPage() {
                 <FormField label="Password" type="password" value={password} onChange={setPassword} placeholder="••••••••"
                   autoComplete={mode === 'register' ? 'new-password' : 'current-password'} />
 
+                {mode === 'login' && (
+                  <FormField
+                    label="2FA OTP (nếu đã bật)"
+                    value={totpCode}
+                    onChange={v => setTotpCode(v.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="123456"
+                    autoComplete="one-time-code"
+                    required={false}
+                  />
+                )}
+
                 {mode === 'register' && (
                   <PassphraseFields
                     passphrase={passphrase} setPassphrase={setPassphrase}
@@ -244,16 +256,16 @@ export function LoginPage() {
 }
 
 // ─── Shared subcomponents ─────────────────────────────────────────────────────
-function FormField({ label, value, onChange, type = 'text', placeholder, autoComplete }: {
+function FormField({ label, value, onChange, type = 'text', placeholder, autoComplete, required = true }: {
   label: string; value: string; onChange: (v: string) => void
-  type?: string; placeholder?: string; autoComplete?: string
+  type?: string; placeholder?: string; autoComplete?: string; required?: boolean
 }) {
   return (
     <div>
       <label className="block text-xs text-dark-400 tracking-wider mb-1.5 uppercase">{label}</label>
       <input
         type={type} value={value} onChange={e => onChange(e.target.value)}
-        placeholder={placeholder} autoComplete={autoComplete} required
+        placeholder={placeholder} autoComplete={autoComplete} required={required}
         className="cyber-input w-full text-sm"
       />
     </div>

@@ -4,7 +4,8 @@
 This repository is a monorepo with workspace packages under `apps/*` and `packages/*`.
 
 - `apps/web`: React + Vite frontend (`src/`, `vite.config.ts`, Tailwind config).
-- `apps/mobile` and `apps/mobile2`: Expo React Native clients (`app/`, `assets/`, platform folders).
+- `apps/mobile`: Expo React Native client (latest).
+- `apps/mobile-legacy`: Expo React Native client (legacy).
 - `apps/desktop`: Electron wrapper and a `wails-app` Go subproject.
 - `packages/common`: Shared TypeScript crypto/types used across clients.
 - `packages/server`: Go backend (`cmd/server`, `internal/*`, SQL schema, Docker/Fly config).

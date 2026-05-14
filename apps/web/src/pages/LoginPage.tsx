@@ -5,6 +5,7 @@ export function LoginPage() {
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [totpCode, setTotpCode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const { login, register } = useAuthStore()
@@ -14,7 +15,7 @@ export function LoginPage() {
     setError(null)
     setLoading(true)
     try {
-      if (mode === 'login') await login(username, password)
+      if (mode === 'login') await login(username, password, totpCode)
       else await register(username, password)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Unknown error')
@@ -80,6 +81,19 @@ export function LoginPage() {
                 required
               />
             </div>
+            {mode === 'login' && (
+              <div>
+                <label className="block text-xs text-neon-cyan mb-1 tracking-wider">2FA OTP (OPTIONAL)</label>
+                <input
+                  className="cyber-input w-full"
+                  placeholder="123456"
+                  value={totpCode}
+                  onChange={e => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                />
+              </div>
+            )}
 
             {error && (
               <p className="text-red-400 text-xs border border-red-900 bg-red-950/30 rounded-cyber px-3 py-2">

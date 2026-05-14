@@ -22,3 +22,22 @@ allprojects {
 
 apply plugin: "expo-root-project"
 apply plugin: "com.facebook.react.rootproject"
+
+gradle.projectsEvaluated {
+  def workletsProject = project.findProject(':react-native-worklets')
+  def reanimatedProject = project.findProject(':react-native-reanimated')
+
+  if (workletsProject != null && reanimatedProject != null) {
+    def releaseWorkletsPrefabTasks = workletsProject.tasks.matching { task ->
+      task.name == 'generateJsonModelRelease' ||
+        task.name == 'prefabReleaseConfigurePackage' ||
+        task.name == 'prefabReleasePackage'
+    }
+
+    reanimatedProject.tasks.matching { task ->
+      task.name.startsWith('configureCMakeRelWithDebInfo')
+    }.configureEach { task ->
+      task.dependsOn(releaseWorkletsPrefabTasks)
+    }
+  }
+}

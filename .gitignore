@@ -28,6 +28,7 @@ Thumbs.db
 .vscode/settings.json
 .idea/
 *.iml
+.claude/settings.local.json
 
 # TypeScript
 *.tsbuildinfo

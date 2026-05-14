@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	dbcrypto "amoon-eclipse/server/internal/crypto"
@@ -19,19 +21,31 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/pquerna/otp/totp"
 )
 
 type Handler struct {
-	db                   *sql.DB
-	jwtSecret            string
-	enc                  *dbcrypto.FieldEncryptor
-	hmac                 *dbcrypto.HmacTokener
-	googleClientID       string
-	googleClientSecret   string
-	googleRedirectURI    string
-	oauthAppRedirect     string
-	facebookAppID        string
-	mailer               *email.Sender
+	db                 *sql.DB
+	jwtSecret          string
+	enc                *dbcrypto.FieldEncryptor
+	hmac               *dbcrypto.HmacTokener
+	googleClientID     string
+	googleClientSecret string
+	googleRedirectURI  string
+	oauthAppRedirect   string
+	facebookAppID      string
+	mailer             *email.Sender
+	oauthStateMu       sync.Mutex
+	oauthStateStore    map[string]int64
+	oauthCodeMu        sync.Mutex
+	oauthCodeStore     map[string]oauthExchangePayload
+}
+
+type oauthExchangePayload struct {
+	Token    string
+	UserID   string
+	Username string
+	Expires  int64
 }
 
 func (h *Handler) googleOAuthReady() bool {
@@ -68,6 +82,8 @@ func NewHandler(
 		oauthAppRedirect:   oauthAppRedirect,
 		facebookAppID:      facebookAppID,
 		mailer:             mailer,
+		oauthStateStore:    map[string]int64{},
+		oauthCodeStore:     map[string]oauthExchangePayload{},
 	}
 }
 
@@ -79,6 +95,7 @@ func (h *Handler) Routes() chi.Router {
 	r.Post("/oauth", h.oauth)
 	r.Get("/google/start", h.googleStart)
 	r.Get("/google/callback", h.googleCallback)
+	r.Post("/google/exchange", h.googleExchange)
 	r.Post("/forgot-password", h.forgotPassword)
 	r.Post("/forgot-username", h.forgotUsername)
 	r.Post("/reset-password", h.resetPassword)
@@ -106,6 +123,11 @@ func (h *Handler) requireAuth(next http.Handler) http.Handler {
 			jsonError(w, "invalid token", http.StatusUnauthorized)
 			return
 		}
+		currentVersion, err := CurrentTokenVersion(r.Context(), h.db, claims.UserID)
+		if err != nil || currentVersion != claims.TokenVersion {
+			jsonError(w, "token revoked", http.StatusUnauthorized)
+			return
+		}
 		ctx := r.Context()
 		ctx = context.WithValue(ctx, ContextKeyUserID, claims.UserID)
 		ctx = context.WithValue(ctx, ContextKeyUsername, claims.Username)
@@ -116,9 +138,11 @@ func (h *Handler) requireAuth(next http.Handler) http.Handler {
 // ── Register (email + password) ────────────────────────────────────────────
 
 type registerReq struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Password string `json:"password"` // Argon2id hash từ client
+	Username    string `json:"username"`
+	Email       string `json:"email"`
+	Password    string `json:"password"` // Argon2id hash từ client
+	PublicKey   string `json:"publicKey"`
+	Fingerprint string `json:"fingerprint"`
 }
 
 func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
@@ -156,15 +180,19 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 
 	id := uuid.NewString()
 	_, err = h.db.ExecContext(r.Context(),
-		`INSERT INTO users(id,username,password_hash,email_enc,email_token) VALUES(?,?,?,?,?)`,
-		id, req.Username, serverHash, nullStr(emailEnc), nullStr(emailToken),
+		`INSERT INTO users(id,username,password_hash,email_enc,email_token,public_key,fingerprint) VALUES(?,?,?,?,?,?,?)`,
+		id, req.Username, serverHash, nullStr(emailEnc), nullStr(emailToken), nullStr(strings.TrimSpace(req.PublicKey)), nullStr(strings.TrimSpace(req.Fingerprint)),
 	)
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
 	}
 
-	token, _ := SignJWT(id, req.Username, h.jwtSecret)
+	token, err := h.issueJWT(r.Context(), id, req.Username)
+	if err != nil {
+		jsonError(w, "token error", http.StatusInternalServerError)
+		return
+	}
 	jsonOK(w, map[string]any{"token": token, "userId": id, "username": req.Username})
 }
 
@@ -173,6 +201,7 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 type loginReq struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+	TOTPCode string `json:"totpCode"`
 }
 
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
@@ -182,11 +211,13 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var id, username, hash string
+	var id, username, hash, totpSecret string
+	var totpEnabled int
 	err := h.db.QueryRowContext(r.Context(),
-		`SELECT id, username, password_hash FROM users WHERE username=? AND password_hash IS NOT NULL`,
+		`SELECT id, username, password_hash, COALESCE(totp_enabled,0), COALESCE(totp_secret,'')
+		 FROM users WHERE username=? AND password_hash IS NOT NULL`,
 		req.Username,
-	).Scan(&id, &username, &hash)
+	).Scan(&id, &username, &hash, &totpEnabled, &totpSecret)
 	if err != nil {
 		jsonError(w, "sai username hoặc password", http.StatusUnauthorized)
 		return
@@ -197,12 +228,27 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "sai username hoặc password", http.StatusUnauthorized)
 		return
 	}
+	if totpEnabled == 1 {
+		code := strings.TrimSpace(req.TOTPCode)
+		if code == "" {
+			jsonError(w, "totp_required", http.StatusUnauthorized)
+			return
+		}
+		if !verifyUserTOTP(code, totpSecret) {
+			jsonError(w, "totp_invalid", http.StatusUnauthorized)
+			return
+		}
+	}
 
-	var pubKey string
-	h.db.QueryRowContext(r.Context(), `SELECT COALESCE(public_key,'') FROM users WHERE id=?`, id).Scan(&pubKey)
+	var pubKey, signalBundle string
+	h.db.QueryRowContext(r.Context(), `SELECT COALESCE(public_key,''), COALESCE(signal_bundle,'') FROM users WHERE id=?`, id).Scan(&pubKey, &signalBundle)
 
-	token, _ := SignJWT(id, username, h.jwtSecret)
-	jsonOK(w, map[string]any{"token": token, "userId": id, "username": username, "publicKey": pubKey})
+	token, err := h.issueJWT(r.Context(), id, username)
+	if err != nil {
+		jsonError(w, "token error", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]any{"token": token, "userId": id, "username": username, "publicKey": pubKey, "signalBundle": signalBundle})
 }
 
 // ── OAuth (Google / Facebook) ──────────────────────────────────────────────
@@ -285,15 +331,20 @@ func (h *Handler) oauth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, _ := SignJWT(id, username, h.jwtSecret)
+	token, err := h.issueJWT(r.Context(), id, username)
+	if err != nil {
+		jsonError(w, "token error", http.StatusInternalServerError)
+		return
+	}
 	jsonOK(w, map[string]any{"token": token, "userId": id, "username": username})
 }
 
 // ── Register Public Key ────────────────────────────────────────────────────
 
 type registerKeyReq struct {
-	PublicKey   string `json:"publicKey"`
-	Fingerprint string `json:"fingerprint"`
+	PublicKey    string `json:"publicKey"`
+	Fingerprint  string `json:"fingerprint"`
+	SignalBundle any    `json:"signalBundle"`
 }
 
 func (h *Handler) registerKey(w http.ResponseWriter, r *http.Request) {
@@ -305,9 +356,19 @@ func (h *Handler) registerKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	signalBundleJSON := ""
+	if req.SignalBundle != nil {
+		if b, err := json.Marshal(req.SignalBundle); err == nil {
+			signalBundleJSON = string(b)
+		}
+	}
+
 	_, err := h.db.ExecContext(r.Context(),
-		`UPDATE users SET public_key=?, fingerprint=? WHERE id=?`,
-		req.PublicKey, req.Fingerprint, userID,
+		`UPDATE users SET public_key=?, fingerprint=?, signal_bundle=? WHERE id=?`,
+		nullStr(strings.TrimSpace(req.PublicKey)),
+		nullStr(strings.TrimSpace(req.Fingerprint)),
+		nullStr(strings.TrimSpace(signalBundleJSON)),
+		userID,
 	)
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
@@ -413,6 +474,14 @@ func nullStr(s string) any {
 	return s
 }
 
+func (h *Handler) issueJWT(ctx context.Context, userID, username string) (string, error) {
+	version, err := CurrentTokenVersion(ctx, h.db, userID)
+	if err != nil {
+		return "", err
+	}
+	return SignJWT(userID, username, h.jwtSecret, version)
+}
+
 func jsonOK(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(v)
@@ -478,7 +547,7 @@ func (h *Handler) forgotPassword(w http.ResponseWriter, r *http.Request) {
 
 	expires := time.Now().Add(10 * time.Minute).Unix()
 	h.db.ExecContext(r.Context(),
-		`UPDATE users SET reset_token=?, reset_expires=? WHERE id=?`,
+		`UPDATE users SET reset_token=?, reset_expires=?, reset_attempts=0 WHERE id=?`,
 		otpHash, expires, id,
 	)
 
@@ -496,6 +565,8 @@ type resetReq struct {
 	Password string `json:"password"` // new password hash
 }
 
+const maxResetOTPAttempts = 5
+
 func (h *Handler) resetPassword(w http.ResponseWriter, r *http.Request) {
 	var req resetReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Email == "" || req.OTP == "" || req.Password == "" {
@@ -506,22 +577,49 @@ func (h *Handler) resetPassword(w http.ResponseWriter, r *http.Request) {
 	token := h.hmac.Token(strings.ToLower(req.Email))
 	var id, otpHash string
 	var expires int64
+	var resetAttempts int
 	err := h.db.QueryRowContext(r.Context(),
-		`SELECT id, reset_token, reset_expires FROM users WHERE email_token=? AND reset_token IS NOT NULL`,
+		`SELECT id, reset_token, reset_expires, COALESCE(reset_attempts,0)
+		 FROM users WHERE email_token=? AND reset_token IS NOT NULL`,
 		token,
-	).Scan(&id, &otpHash, &expires)
+	).Scan(&id, &otpHash, &expires, &resetAttempts)
 	if err != nil {
 		jsonError(w, "OTP không hợp lệ hoặc đã hết hạn", http.StatusUnauthorized)
 		return
 	}
+	if resetAttempts >= maxResetOTPAttempts {
+		h.db.ExecContext(r.Context(),
+			`UPDATE users SET reset_token=NULL, reset_expires=NULL, reset_attempts=0 WHERE id=?`,
+			id,
+		)
+		jsonError(w, "OTP đã bị khóa do nhập sai quá nhiều lần", http.StatusTooManyRequests)
+		return
+	}
 
 	if time.Now().Unix() > expires {
+		h.db.ExecContext(r.Context(),
+			`UPDATE users SET reset_token=NULL, reset_expires=NULL, reset_attempts=0 WHERE id=?`,
+			id,
+		)
 		jsonError(w, "OTP đã hết hạn", http.StatusUnauthorized)
 		return
 	}
 
 	ok, _ := VerifyArgon2id(req.OTP, otpHash)
 	if !ok {
+		nextAttempts := resetAttempts + 1
+		if nextAttempts >= maxResetOTPAttempts {
+			h.db.ExecContext(r.Context(),
+				`UPDATE users SET reset_token=NULL, reset_expires=NULL, reset_attempts=0 WHERE id=?`,
+				id,
+			)
+			jsonError(w, "OTP đã bị khóa do nhập sai quá nhiều lần", http.StatusTooManyRequests)
+			return
+		}
+		h.db.ExecContext(r.Context(),
+			`UPDATE users SET reset_attempts=? WHERE id=?`,
+			nextAttempts, id,
+		)
 		jsonError(w, "OTP sai", http.StatusUnauthorized)
 		return
 	}
@@ -533,9 +631,13 @@ func (h *Handler) resetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.db.ExecContext(r.Context(),
-		`UPDATE users SET password_hash=?, reset_token=NULL, reset_expires=NULL WHERE id=?`,
+		`UPDATE users SET password_hash=?, reset_token=NULL, reset_expires=NULL, reset_attempts=0 WHERE id=?`,
 		newHash, id,
 	)
+	if err := IncrementTokenVersion(r.Context(), h.db, id); err != nil {
+		jsonError(w, "server error", http.StatusInternalServerError)
+		return
+	}
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 
@@ -577,12 +679,25 @@ func (h *Handler) googleStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	state := randomURLToken(32)
+	h.storeOAuthState(state, time.Now().Add(10*time.Minute).Unix())
+	http.SetCookie(w, &http.Cookie{
+		Name:     "amoon_oauth_state",
+		Value:    state,
+		Path:     "/api/auth/google/callback",
+		HttpOnly: true,
+		Secure:   isHTTPSRequest(r),
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   600,
+	})
+
 	params := url.Values{
 		"client_id":     {h.googleClientID},
 		"redirect_uri":  {h.googleRedirectURI},
 		"response_type": {"code"},
 		"scope":         {"openid email profile"},
 		"access_type":   {"offline"},
+		"state":         {state},
 	}
 	http.Redirect(w, r, "https://accounts.google.com/o/oauth2/v2/auth?"+params.Encode(), http.StatusFound)
 }
@@ -592,6 +707,34 @@ func (h *Handler) googleCallback(w http.ResponseWriter, r *http.Request) {
 		h.redirectOAuthError(w, r, "google_not_configured")
 		return
 	}
+
+	queryState := strings.TrimSpace(r.URL.Query().Get("state"))
+	if queryState == "" {
+		h.redirectOAuthError(w, r, "missing_state")
+		return
+	}
+	cookie, err := r.Cookie("amoon_oauth_state")
+	if err != nil || cookie == nil || strings.TrimSpace(cookie.Value) == "" {
+		h.redirectOAuthError(w, r, "missing_state_cookie")
+		return
+	}
+	if cookie.Value != queryState {
+		h.redirectOAuthError(w, r, "invalid_state")
+		return
+	}
+	if !h.consumeOAuthState(queryState) {
+		h.redirectOAuthError(w, r, "expired_state")
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     "amoon_oauth_state",
+		Value:    "",
+		Path:     "/api/auth/google/callback",
+		HttpOnly: true,
+		Secure:   isHTTPSRequest(r),
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+	})
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
@@ -667,18 +810,46 @@ func (h *Handler) googleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := SignJWT(userID, username, h.jwtSecret)
+	token, err := h.issueJWT(r.Context(), userID, username)
 	if err != nil {
 		h.redirectOAuthError(w, r, "jwt")
 		return
 	}
 
+	exchangeCode := randomURLToken(32)
+	h.storeOAuthCode(exchangeCode, oauthExchangePayload{
+		Token:    token,
+		UserID:   userID,
+		Username: username,
+		Expires:  time.Now().Add(2 * time.Minute).Unix(),
+	})
+
 	params := url.Values{
-		"token":    {token},
-		"userId":   {userID},
-		"username": {username},
+		"code": {exchangeCode},
 	}
 	http.Redirect(w, r, h.oauthRedirectTarget()+"?"+params.Encode(), http.StatusFound)
+}
+
+type googleExchangeReq struct {
+	Code string `json:"code"`
+}
+
+func (h *Handler) googleExchange(w http.ResponseWriter, r *http.Request) {
+	var req googleExchangeReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Code) == "" {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	payload, ok := h.consumeOAuthCode(strings.TrimSpace(req.Code))
+	if !ok {
+		jsonError(w, "invalid_or_expired_code", http.StatusUnauthorized)
+		return
+	}
+	jsonOK(w, map[string]any{
+		"token":    payload.Token,
+		"userId":   payload.UserID,
+		"username": payload.Username,
+	})
 }
 
 // ── Forgot username ────────────────────────────────────────────────────────
@@ -734,4 +905,80 @@ func genOTP() string {
 		otp[i] = digits[n.Int64()]
 	}
 	return string(otp)
+}
+
+func verifyUserTOTP(code, secret string) bool {
+	if strings.TrimSpace(secret) == "" {
+		return false
+	}
+	return totp.Validate(strings.TrimSpace(code), secret)
+}
+
+func randomURLToken(size int) string {
+	if size <= 0 {
+		size = 32
+	}
+	b := make([]byte, size)
+	if _, err := rand.Read(b); err != nil {
+		return uuid.NewString()
+	}
+	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+func (h *Handler) storeOAuthState(state string, expires int64) {
+	now := time.Now().Unix()
+	h.oauthStateMu.Lock()
+	defer h.oauthStateMu.Unlock()
+	for k, exp := range h.oauthStateStore {
+		if exp <= now {
+			delete(h.oauthStateStore, k)
+		}
+	}
+	h.oauthStateStore[state] = expires
+}
+
+func (h *Handler) consumeOAuthState(state string) bool {
+	now := time.Now().Unix()
+	h.oauthStateMu.Lock()
+	defer h.oauthStateMu.Unlock()
+	exp, ok := h.oauthStateStore[state]
+	if !ok {
+		return false
+	}
+	delete(h.oauthStateStore, state)
+	return exp > now
+}
+
+func (h *Handler) storeOAuthCode(code string, payload oauthExchangePayload) {
+	now := time.Now().Unix()
+	h.oauthCodeMu.Lock()
+	defer h.oauthCodeMu.Unlock()
+	for k, p := range h.oauthCodeStore {
+		if p.Expires <= now {
+			delete(h.oauthCodeStore, k)
+		}
+	}
+	h.oauthCodeStore[code] = payload
+}
+
+func (h *Handler) consumeOAuthCode(code string) (oauthExchangePayload, bool) {
+	now := time.Now().Unix()
+	h.oauthCodeMu.Lock()
+	defer h.oauthCodeMu.Unlock()
+	payload, ok := h.oauthCodeStore[code]
+	if !ok {
+		return oauthExchangePayload{}, false
+	}
+	delete(h.oauthCodeStore, code)
+	if payload.Expires <= now {
+		return oauthExchangePayload{}, false
+	}
+	return payload, true
+}
+
+func isHTTPSRequest(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	return strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }

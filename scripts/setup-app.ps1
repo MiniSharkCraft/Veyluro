@@ -3,8 +3,8 @@ $ErrorActionPreference = "Stop"
 
 $rootDir = Split-Path -Parent $PSScriptRoot
 $webEnvFile = Join-Path $rootDir "apps/web/.env.local"
-$mobileEnvFile = Join-Path $rootDir "apps/mobile2/.env"
-$mobileAppJson = Join-Path $rootDir "apps/mobile2/app.json"
+$mobileEnvFile = Join-Path $rootDir "apps/mobile/.env"
+$mobileAppJson = Join-Path $rootDir "apps/mobile/app.json"
 
 function Read-Default([string]$Label, [string]$Default) {
   $v = Read-Host "$Label [$Default]"
@@ -65,7 +65,7 @@ $target = Read-Default "Build target (none|web|desktop|apk)" "none"
 switch ($target.ToLowerInvariant()) {
   "web" { Push-Location $rootDir; npm run build --workspace=apps/web; Pop-Location }
   "desktop" { Push-Location $rootDir; npm run build --workspace=apps/desktop; Pop-Location }
-  "apk" { Push-Location $rootDir; npm run build:apk --workspace=apps/mobile2; Pop-Location }
+  "apk" { Push-Location $rootDir; npm run build:apk --workspace=apps/mobile; Pop-Location }
   default { }
 }
 

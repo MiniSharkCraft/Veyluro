@@ -1,6 +1,6 @@
 # Expo Go — Android Fast-Test Guide
 
-> Get AMoon Eclipse running on your Android device in < 5 minutes. No USB, no emulator.
+> Get MesSmini running on your Android device in < 5 minutes. No USB, no emulator.
 
 ## Prerequisites
 

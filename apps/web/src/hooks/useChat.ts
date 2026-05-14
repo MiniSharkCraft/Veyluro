@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { openDB } from 'idb'
 import { WS_BASE, messagesApi, roomsApi, type MemberType, type MessageType } from '../lib/api'
-import { encryptMessage, decryptMessage, type MessageBundle, importRsaPrivateKey } from '@messmini/common'
+import { encryptMessage, decryptMessage, normalizeEmoticons, type MessageBundle, importRsaPrivateKey } from '@messmini/common'
 
 async function loadPrivKey(userId: string): Promise<CryptoKey | null> {
   try {
@@ -49,7 +49,7 @@ export function useChat(roomId: string) {
         const history = await messagesApi.list(roomId)
         if (!alive) return
         const decrypted = await Promise.all(history.map(m => decryptHistoryMsg(m, userId, privateKey)))
-        setMessages(decrypted.filter(Boolean) as ChatMsg[])
+        setMessages(decrypted)
       } catch (e) {
         console.warn('[useChat] init:', e)
       } finally {
@@ -118,14 +118,15 @@ export function useChat(roomId: string) {
   const sendMessage = useCallback(async (text: string) => {
     const session = sessionRef.current
     if (!session || !text.trim()) return
+    const normalized = normalizeEmoticons(text)
     const tempId = `temp_${Date.now()}`
     const time = new Date().toLocaleTimeString('vi', { hour: '2-digit', minute: '2-digit' })
-    const optimistic: ChatMsg = { id: tempId, text, senderId: session.userId, mine: true, time, status: 'sent', pending: true }
+    const optimistic: ChatMsg = { id: tempId, text: normalized, senderId: session.userId, mine: true, time, status: 'sent', pending: true }
     setMessages(prev => [...prev, optimistic])
     try {
       const recipients = members.filter(m => m.publicKey).map(m => ({ id: m.id, publicKey: m.publicKey }))
       if (recipients.length === 0) throw new Error('No recipients')
-      const bundle = await encryptMessage(text, recipients)
+      const bundle = await encryptMessage(normalized, recipients)
       const bundleStr = JSON.stringify(bundle)
       const { id } = await messagesApi.send(roomId, bundleStr)
       setMessages(prev => prev.map(m => m.id === tempId ? { ...m, id, status: 'delivered', pending: false } : m))
@@ -138,11 +139,13 @@ export function useChat(roomId: string) {
   return { messages, members, connected, loading, sendMessage, wsRef: ws }
 }
 
-async function decryptHistoryMsg(m: MessageType, myId: string, privateKey: CryptoKey): Promise<ChatMsg | null> {
+async function decryptHistoryMsg(m: MessageType, myId: string, privateKey: CryptoKey): Promise<ChatMsg> {
+  const time = new Date(m.createdAt * 1000).toLocaleTimeString('vi', { hour: '2-digit', minute: '2-digit' })
   try {
     const bundle: MessageBundle = JSON.parse(m.bundle)
     const text = await decryptMessage(bundle, myId, privateKey)
-    const time = new Date(m.createdAt * 1000).toLocaleTimeString('vi', { hour: '2-digit', minute: '2-digit' })
     return { id: m.id, text, senderId: m.senderId, mine: m.senderId === myId, time, status: 'read' }
-  } catch { return null }
+  } catch {
+    return { id: m.id, text: '[encrypted]', senderId: m.senderId, mine: m.senderId === myId, time, status: 'read' }
+  }
 }

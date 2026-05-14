@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WEB_ENV_FILE="$ROOT_DIR/apps/web/.env.local"
-MOBILE_ENV_FILE="$ROOT_DIR/apps/mobile2/.env"
-MOBILE_APP_JSON="$ROOT_DIR/apps/mobile2/app.json"
+MOBILE_ENV_FILE="$ROOT_DIR/apps/mobile/.env"
+MOBILE_APP_JSON="$ROOT_DIR/apps/mobile/app.json"
 
 prompt_default() {
   local label="$1"
@@ -79,7 +79,7 @@ case "$target" in
     (cd "$ROOT_DIR" && npm run build --workspace=apps/desktop)
     ;;
   apk)
-    (cd "$ROOT_DIR" && npm run build:apk --workspace=apps/mobile2)
+    (cd "$ROOT_DIR" && npm run build:apk --workspace=apps/mobile)
     ;;
   none)
     ;;

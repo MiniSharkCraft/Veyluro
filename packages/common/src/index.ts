@@ -1,3 +1,4 @@
 export * from './crypto-engine'
 export * from './types'
 export * from './argon2'
+export * from './emoticon-emoji'

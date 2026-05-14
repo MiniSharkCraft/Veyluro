@@ -1,69 +1,64 @@
 import { Tabs } from 'expo-router'
-import { View, Text, StyleSheet } from 'react-native'
+import { StyleSheet, useColorScheme, View } from 'react-native'
+import {
+  ChatCircleIcon,
+  CircleDashedIcon,
+  NoteIcon,
+  TrayIcon,
+  UsersThreeIcon,
+  type Icon,
+} from 'phosphor-react-native'
+import { getTheme, type AppTheme } from '../../../src/lib/theme'
 
-function TabIcon({ label, active, dot }: { label: string; active: boolean; dot?: boolean }) {
-  const icons: Record<string, string> = {
-    'Chats': '💬', 'Khám phá': '◎', 'Hồ sơ': '◉',
-  }
+function TabIcon({
+  icon: IconComponent,
+  active,
+  badge,
+  theme,
+}: {
+  icon: Icon
+  active: boolean
+  badge?: number
+  theme: AppTheme
+}) {
   return (
     <View style={ti.wrap}>
-      <Text style={[ti.icon, active && ti.iconActive]}>{icons[label]}</Text>
-      {dot && <View style={ti.dot} />}
+      <IconComponent size={23} color={active ? theme.accent : theme.faint} weight={active ? 'fill' : 'bold'} />
+      {badge ? <View style={ti.badge} /> : null}
     </View>
   )
 }
 
 const ti = StyleSheet.create({
-  wrap: { alignItems: 'center', position: 'relative' },
-  icon: { fontSize: 22, opacity: 0.4 },
-  iconActive: { opacity: 1 },
-  dot: {
-    position: 'absolute', top: 0, right: -4,
-    width: 7, height: 7, borderRadius: 4,
-    backgroundColor: '#EC4899',
-    borderWidth: 1.5, borderColor: '#08080F',
-  },
+  wrap:  { alignItems: 'center', justifyContent: 'center', minWidth: 28, minHeight: 28 },
+  badge: { position: 'absolute', top: 0, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' },
 })
 
 export default function TabsLayout() {
+  const theme = getTheme(useColorScheme())
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#0E0E1C',
-          borderTopColor: '#1A1A2E',
+          backgroundColor: theme.bg,
+          borderTopColor: theme.border,
           borderTopWidth: 1,
-          height: 64,
-          paddingBottom: 10,
+          height: 68,
+          paddingBottom: 12,
           paddingTop: 8,
         },
-        tabBarActiveTintColor: '#818CF8',
-        tabBarInactiveTintColor: '#374151',
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '600', letterSpacing: 0.3 },
+        tabBarActiveTintColor: theme.accent,
+        tabBarInactiveTintColor: theme.faint,
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Chats',
-          tabBarIcon: ({ focused }) => <TabIcon label="Chats" active={focused} dot />,
-        }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Khám phá',
-          tabBarIcon: ({ focused }) => <TabIcon label="Khám phá" active={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Hồ sơ',
-          tabBarIcon: ({ focused }) => <TabIcon label="Hồ sơ" active={focused} />,
-        }}
-      />
+      <Tabs.Screen name="index" options={{ title: 'Chats', tabBarIcon: ({ focused }) => <TabIcon icon={ChatCircleIcon} active={focused} theme={theme} /> }} />
+      <Tabs.Screen name="friends" options={{ title: 'Mạng lưới', tabBarIcon: ({ focused }) => <TabIcon icon={UsersThreeIcon} active={focused} theme={theme} /> }} />
+      <Tabs.Screen name="pending" options={{ title: 'Hộp chờ', tabBarIcon: ({ focused }) => <TabIcon icon={TrayIcon} active={focused} theme={theme} /> }} />
+      <Tabs.Screen name="stories" options={{ title: 'Nhật ký', tabBarIcon: ({ focused }) => <TabIcon icon={CircleDashedIcon} active={focused} theme={theme} /> }} />
+      <Tabs.Screen name="notes" options={{ title: 'Vault', tabBarIcon: ({ focused }) => <TabIcon icon={NoteIcon} active={focused} theme={theme} /> }} />
     </Tabs>
   )
 }

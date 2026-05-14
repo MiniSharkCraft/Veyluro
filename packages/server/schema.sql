@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
   username        TEXT UNIQUE NOT NULL,                 -- public, plaintext
   public_key      TEXT,                                 -- Base64 SPKI RSA-2048
   fingerprint     TEXT,                                 -- SHA-256 của public_key
+  signal_bundle   TEXT,                                 -- JSON pre-key bundle cho Signal protocol
 
   -- Password-based auth (NULL nếu dùng OAuth)
   password_hash   TEXT,                                 -- Argon2id encoded string (client hashed)
@@ -26,6 +27,7 @@ CREATE TABLE IF NOT EXISTS users (
   -- OAuth
   oauth_provider  TEXT,                                 -- 'google' | 'facebook'
   oauth_id        TEXT,                                 -- provider's user ID (plaintext — không phải PII)
+  token_version   INTEGER NOT NULL DEFAULT 0,           -- revoke JWT cũ khi security event
 
   -- PII — mã hóa AES-256-GCM
   email_enc       TEXT,                                 -- AES-GCM encrypted email

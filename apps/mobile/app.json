@@ -2,53 +2,38 @@
   "expo": {
     "name": "AMoon Eclipse",
     "slug": "amoon-eclipse",
-    "version": "0.1.0",
+    "scheme": "amoon-eclipse",
+    "version": "1.3.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "amoon",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#08080F"
-    },
-    "ios": {
-      "supportsTablet": false,
-      "bundleIdentifier": "dev.congmc.amoon"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#08080F"
       },
-      "package": "dev.congmc.amoon",
-      "intentFilters": [
-        {
-          "action": "VIEW",
-          "autoVerify": true,
-          "data": [
-            {
-              "scheme": "amoon",
-              "host": "auth"
-            }
-          ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
-        }
-      ]
+      "package": "com.amoon.eclipse"
     },
-    "web": {
-      "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/favicon.png"
+    "ios": {
+      "bundleIdentifier": "com.amoon.eclipse",
+      "buildNumber": "2",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Used to secure your encryption keys",
+        "NSCameraUsageDescription": "Used for video calls",
+        "NSMicrophoneUsageDescription": "Used for voice and video calls"
+      }
     },
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-web-browser",
-      "expo-font"
+      "expo-notifications",
+      "./plugins/withIntegrity"
     ],
     "experiments": {
       "typedRoutes": true
@@ -56,9 +41,7 @@
     "extra": {
       "eas": {
         "projectId": "3f9599e5-2923-4d3e-85cc-7c27f102da44"
-      },
-      "router": {}
-    },
-    "owner": "congmc"
+      }
+    }
   }
 }
