@@ -12,7 +12,7 @@
            V E Y L U R O   ·   W A T E R   &   D R A G O N
 ```
 
-> **Slogan:** Veil your privacy. Let the dragon flow.
+> "Veil your privacy. Let the dragon flow."
 
 **End-to-End Encrypted Messenger - Mobile · Desktop · Server Web**
 
