@@ -177,9 +177,9 @@ export default function LoginScreen() {
 
       await setupAndSaveKey(oauth.userId, oauth.token, passphrase || undefined)
       await Promise.all([
-        SecureStore.setItemAsync('amoon_userId', oauth.userId),
-        SecureStore.setItemAsync('amoon_username', oauth.username ?? ''),
-        SecureStore.setItemAsync('amoon_token', oauth.token),
+        SecureStore.setItemAsync('veyluro_userId', oauth.userId),
+        SecureStore.setItemAsync('veyluro_username', oauth.username ?? ''),
+        SecureStore.setItemAsync('veyluro_token', oauth.token),
       ])
       setShowAuthChoice(false)
       setPendingOAuth(null)
@@ -197,8 +197,8 @@ export default function LoginScreen() {
     async function redirectExistingSession() {
       try {
         const [token, userId] = await Promise.all([
-          SecureStore.getItemAsync('amoon_token'),
-          SecureStore.getItemAsync('amoon_userId'),
+          SecureStore.getItemAsync('veyluro_token'),
+          SecureStore.getItemAsync('veyluro_userId'),
         ])
         if (!alive || !token || !userId) return
 
@@ -238,7 +238,7 @@ export default function LoginScreen() {
     try {
       const result = await WebBrowser.openAuthSessionAsync(
         `${API}/api/auth/google/start`,
-        'amoon-eclipse://auth'
+        'veyluro://auth'
       )
       if (result.type !== 'success') { setLoading(null); return }
       const { queryParams } = Linking.parse(result.url)
@@ -314,9 +314,9 @@ export default function LoginScreen() {
           body: JSON.stringify({ encryptedKey, keySalt }),
         })
         await Promise.all([
-          SecureStore.setItemAsync('amoon_userId', data.userId),
-          SecureStore.setItemAsync('amoon_username', data.username),
-          SecureStore.setItemAsync('amoon_token', data.token),
+          SecureStore.setItemAsync('veyluro_userId', data.userId),
+          SecureStore.setItemAsync('veyluro_username', data.username),
+          SecureStore.setItemAsync('veyluro_token', data.token),
         ])
       } else {
         const res = await fetch(`${API}/api/auth/login`, {
@@ -344,9 +344,9 @@ export default function LoginScreen() {
         const pk = await SecureStore.getItemAsync(`privateKey_${uid}`)
         const localPublicKey = await SecureStore.getItemAsync(localPublicKeyKey(uid))
         await Promise.all([
-          SecureStore.setItemAsync('amoon_userId', uid),
-          SecureStore.setItemAsync('amoon_username', data.username),
-          SecureStore.setItemAsync('amoon_token', data.token),
+          SecureStore.setItemAsync('veyluro_userId', uid),
+          SecureStore.setItemAsync('veyluro_username', data.username),
+          SecureStore.setItemAsync('veyluro_token', data.token),
           data.publicKey ? SecureStore.setItemAsync(localPublicKeyKey(uid), data.publicKey) : Promise.resolve(),
         ])
         if (!pk) {
@@ -436,7 +436,7 @@ export default function LoginScreen() {
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
             <TouchableOpacity onPress={() => setScreen('main')} style={{ marginBottom: 24 }}>
-              <Text style={{ color: '#818CF8', fontSize: 15 }}>‹ Quay lại</Text>
+              <Text style={{ color: '#20C7B3', fontSize: 15 }}>‹ Quay lại</Text>
             </TouchableOpacity>
             <Text style={[s.appName, { marginBottom: 8 }]}>Quên username?</Text>
             <Text style={{ color: '#64748B', fontSize: 13, marginBottom: 24 }}>Nhập email đăng ký — username sẽ được gửi về hộp thư.</Text>
@@ -457,7 +457,7 @@ export default function LoginScreen() {
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
             <TouchableOpacity onPress={() => setScreen('main')} style={{ marginBottom: 24 }}>
-              <Text style={{ color: '#818CF8', fontSize: 15 }}>‹ Quay lại</Text>
+              <Text style={{ color: '#20C7B3', fontSize: 15 }}>‹ Quay lại</Text>
             </TouchableOpacity>
             <Text style={[s.appName, { marginBottom: 24 }]}>Quên mật khẩu</Text>
             {fpStep === 'email' ? (
@@ -502,7 +502,7 @@ export default function LoginScreen() {
               <View style={[s.orbitDot, { top: 4, right: 12 }]} />
               <View style={[s.orbitDot, { bottom: 10, left: 8, backgroundColor: '#EC4899', width: 5, height: 5 }]} />
             </View>
-            <Text style={s.appName}>AMoon Eclipse</Text>
+            <Text style={s.appName}>Veyluro</Text>
             <Text style={s.tagline}>Nhắn tin · Ẩn danh · An toàn</Text>
           </View>
 
@@ -592,10 +592,10 @@ export default function LoginScreen() {
                 {mode === 'login' && (
                   <View style={{ marginTop: 16, alignItems: 'center', gap: 10 }}>
                     <TouchableOpacity onPress={() => setScreen('forgotPassword')}>
-                      <Text style={{ color: '#6366F1', fontSize: 13 }}>Quên mật khẩu?</Text>
+                      <Text style={{ color: '#0FA79A', fontSize: 13 }}>Quên mật khẩu?</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => { setFpEmail(''); setScreen('forgotUsername') }}>
-                      <Text style={{ color: '#4B5563', fontSize: 13 }}>Quên username?</Text>
+                      <Text style={{ color: '#6D8298', fontSize: 13 }}>Quên username?</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -674,35 +674,35 @@ const s = StyleSheet.create({
   scroll:     { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 36 },
   hero:       { alignItems: 'center', marginBottom: 36 },
   moonWrap:   { width: 80, height: 80, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-  moonOuter:  { width: 60, height: 60, borderRadius: 30, backgroundColor: '#6366F1', alignItems: 'flex-end', justifyContent: 'flex-start', padding: 6, shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.9, shadowRadius: 20 },
+  moonOuter:  { width: 60, height: 60, borderRadius: 30, backgroundColor: '#0FA79A', alignItems: 'flex-end', justifyContent: 'flex-start', padding: 6, shadowColor: '#20C7B3', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.9, shadowRadius: 20 },
   moonInner:  { width: 40, height: 40, borderRadius: 20, backgroundColor: '#08080F' },
-  orbitDot:   { position: 'absolute', width: 7, height: 7, borderRadius: 4, backgroundColor: '#8B5CF6' },
+  orbitDot:   { position: 'absolute', width: 7, height: 7, borderRadius: 4, backgroundColor: '#20C7B3' },
   appName:    { color: '#F1F5F9', fontSize: 30, fontWeight: '800', letterSpacing: 0.3, marginBottom: 6 },
   tagline:    { color: '#64748B', fontSize: 13, letterSpacing: 0.5 },
-  card:       { backgroundColor: '#12121E', borderRadius: 24, padding: 20, borderWidth: 1, borderColor: '#1E1E30' },
+  card:       { backgroundColor: '#102131', borderRadius: 24, padding: 20, borderWidth: 1, borderColor: '#1B2F43' },
   tabRow:     { flexDirection: 'row', backgroundColor: '#08080F', borderRadius: 12, padding: 3, marginBottom: 20 },
   tab:        { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-  tabOn:      { backgroundColor: '#1E1B4B' },
-  tabTxt:     { color: '#4B5563', fontSize: 13, fontWeight: '500' },
-  tabTxtOn:   { color: '#818CF8', fontWeight: '700' },
+  tabOn:      { backgroundColor: '#133149' },
+  tabTxt:     { color: '#6D8298', fontSize: 13, fontWeight: '500' },
+  tabTxtOn:   { color: '#20C7B3', fontWeight: '700' },
   modeRow:    { flexDirection: 'row', backgroundColor: '#08080F', borderRadius: 10, padding: 3, marginBottom: 16 },
   modeBtn:    { flex: 1, paddingVertical: 9, borderRadius: 8, alignItems: 'center' },
-  modeBtnOn:  { backgroundColor: '#1E1B4B' },
-  modeTxt:    { color: '#4B5563', fontSize: 13, fontWeight: '500' },
-  modeTxtOn:  { color: '#818CF8', fontWeight: '700' },
-  oauthBtn:   { backgroundColor: '#1E1E30', borderRadius: 14, paddingVertical: 15, paddingHorizontal: 16, marginBottom: 12, borderWidth: 1, borderColor: '#2E2E45' },
+  modeBtnOn:  { backgroundColor: '#133149' },
+  modeTxt:    { color: '#6D8298', fontSize: 13, fontWeight: '500' },
+  modeTxtOn:  { color: '#20C7B3', fontWeight: '700' },
+  oauthBtn:   { backgroundColor: '#1B2F43', borderRadius: 14, paddingVertical: 15, paddingHorizontal: 16, marginBottom: 12, borderWidth: 1, borderColor: '#2E2E45' },
   oauthInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   oauthIconWrap: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   oauthIcon:  { fontWeight: '800', fontSize: 15, color: '#1a1a1a' },
   oauthTxt:   { color: '#F1F5F9', fontSize: 15, fontWeight: '600' },
   fieldWrap:  { marginBottom: 14 },
   label:      { color: '#64748B', fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 7, textTransform: 'uppercase' },
-  input:      { backgroundColor: '#0D0D1A', borderWidth: 1.5, borderColor: '#1E1E30', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: '#F1F5F9', fontSize: 15 },
-  inputOn:    { borderColor: '#6366F1' },
+  input:      { backgroundColor: '#0B1724', borderWidth: 1.5, borderColor: '#1B2F43', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: '#F1F5F9', fontSize: 15 },
+  inputOn:    { borderColor: '#0FA79A' },
   passphraseHint: { color: '#B45309', fontSize: 12, lineHeight: 17, marginBottom: 14, backgroundColor: '#1C1408', borderRadius: 10, padding: 12 },
-  btn:        { backgroundColor: '#6366F1', borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 4 },
+  btn:        { backgroundColor: '#0FA79A', borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 4 },
   btnTxt:     { color: '#fff', fontSize: 16, fontWeight: '700' },
-  hint:       { color: '#374151', fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 8 },
+  hint:       { color: '#4E677F', fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 8 },
   choiceBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'center', padding: 20 },
   choiceCard: { width: '100%', maxWidth: 380, backgroundColor: '#101A27', borderWidth: 1, borderColor: '#1F2D3D', borderRadius: 16, padding: 16 },
   choiceTitle: { color: '#E2F7F4', fontSize: 18, fontWeight: '800', marginBottom: 6 },

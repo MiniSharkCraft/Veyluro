@@ -60,7 +60,7 @@ export default function GroupCreateScreen() {
 
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <ArrowLeftIcon size={23} color="#818CF8" weight="bold" />
+          <ArrowLeftIcon size={23} color="#20C7B3" weight="bold" />
         </TouchableOpacity>
         <Text style={s.title}>Tạo nhóm mới</Text>
         <TouchableOpacity
@@ -68,14 +68,14 @@ export default function GroupCreateScreen() {
           onPress={handleCreate}
           disabled={!groupName.trim() || selected.size === 0 || creating}
         >
-          {creating ? <ActivityIndicator color="#818CF8" size="small" /> : <Text style={s.createBtnTxt}>Tạo</Text>}
+          {creating ? <ActivityIndicator color="#20C7B3" size="small" /> : <Text style={s.createBtnTxt}>Tạo</Text>}
         </TouchableOpacity>
       </View>
 
       {/* Group name input */}
       <View style={s.nameBox}>
         <View style={s.groupIcon}>
-          <UsersThreeIcon size={23} color="#818CF8" weight="fill" />
+          <UsersThreeIcon size={23} color="#20C7B3" weight="fill" />
         </View>
         <TextInput
           style={s.nameInput}
@@ -94,7 +94,7 @@ export default function GroupCreateScreen() {
           {Array.from(selected).map(u => (
             <TouchableOpacity key={u} style={s.chip} onPress={() => toggle(u)}>
               <Text style={s.chipTxt}>@{u}</Text>
-              <XIcon size={12} color="#818CF8" weight="bold" />
+              <XIcon size={12} color="#20C7B3" weight="bold" />
             </TouchableOpacity>
           ))}
         </View>
@@ -103,7 +103,7 @@ export default function GroupCreateScreen() {
       <Text style={s.sectionLabel}>Chọn bạn bè ({selected.size}/3)</Text>
 
       {loading ? (
-        <ActivityIndicator color="#6366F1" style={{ marginTop: 40 }} />
+        <ActivityIndicator color="#0FA79A" style={{ marginTop: 40 }} />
       ) : (
         <FlatList
           data={friends}
@@ -140,27 +140,27 @@ export default function GroupCreateScreen() {
 
 const s = StyleSheet.create({
   root:        { flex: 1, backgroundColor: '#08080F' },
-  header:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#12121E' },
+  header:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#102131' },
   backBtn:     { padding: 4, marginRight: 8 },
   title:       { flex: 1, color: '#F1F5F9', fontSize: 18, fontWeight: '700' },
-  createBtn:   { backgroundColor: '#1E1B4B', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 8 },
-  createBtnTxt:{ color: '#818CF8', fontSize: 14, fontWeight: '700' },
-  nameBox:     { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 16, marginBottom: 8, backgroundColor: '#12121E', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14 },
+  createBtn:   { backgroundColor: '#133149', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 8 },
+  createBtnTxt:{ color: '#20C7B3', fontSize: 14, fontWeight: '700' },
+  nameBox:     { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 16, marginBottom: 8, backgroundColor: '#102131', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14 },
   groupIcon:   { marginRight: 12 },
   nameInput:   { flex: 1, color: '#F1F5F9', fontSize: 16, fontWeight: '600' },
   chipsRow:    { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 8, marginBottom: 12 },
-  chip:        { backgroundColor: '#1E1B4B', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  chipTxt:     { color: '#818CF8', fontSize: 13, fontWeight: '600' },
-  sectionLabel:{ color: '#4B5563', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, paddingHorizontal: 16, marginBottom: 8 },
-  row:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#0D0D1A' },
+  chip:        { backgroundColor: '#133149', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  chipTxt:     { color: '#20C7B3', fontSize: 13, fontWeight: '600' },
+  sectionLabel:{ color: '#6D8298', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, paddingHorizontal: 16, marginBottom: 8 },
+  row:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#0B1724' },
   rowOn:       { backgroundColor: '#0E0E1C' },
   avatar:      { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   avatarTxt:   { color: '#fff', fontSize: 16, fontWeight: '700' },
   rowName:     { color: '#F1F5F9', fontSize: 15, fontWeight: '600' },
   rowSub:      { color: '#64748B', fontSize: 13, marginTop: 2 },
   check:       { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#2E2E45', alignItems: 'center', justifyContent: 'center' },
-  checkOn:     { backgroundColor: '#6366F1', borderColor: '#6366F1' },
+  checkOn:     { backgroundColor: '#0FA79A', borderColor: '#0FA79A' },
   empty:       { alignItems: 'center', paddingTop: 60 },
-  emptyTxt:    { color: '#4B5563', fontSize: 15, marginBottom: 6 },
-  emptySub:    { color: '#374151', fontSize: 13 },
+  emptyTxt:    { color: '#6D8298', fontSize: 15, marginBottom: 6 },
+  emptySub:    { color: '#4E677F', fontSize: 13 },
 })

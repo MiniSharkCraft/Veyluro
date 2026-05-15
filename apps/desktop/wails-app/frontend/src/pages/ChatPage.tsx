@@ -136,7 +136,7 @@ export function ChatPage() {
       {/* Sidebar */}
       <nav className="w-14 shrink-0 bg-[var(--app-panel)] border-r border-[var(--app-border-soft)] flex flex-col items-center py-3 gap-1">
         <div className="w-9 h-9 rounded-full bg-[var(--app-brand-soft)] flex items-center justify-center mb-2 shrink-0">
-          <span className="text-[var(--app-brand)] text-xs font-black">A</span>
+          <span className="text-[var(--app-brand)] text-xs font-black">V</span>
         </div>
         {navItems.filter(n => n.show !== false).map(({ key, icon, label }) => (
           <button key={key} title={label} onClick={() => setTab(key)}
@@ -449,7 +449,7 @@ function ChatsTab({ userId, username, token, privateKey, publicKey, hdr }: {
           <div className="relative">
             <MagnifyingGlass size={18} weight="bold" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--app-text-faint)]" />
             <input className="w-full bg-[var(--app-panel-2)] border border-transparent rounded-full pl-10 pr-3 py-3 text-sm text-[var(--app-text)] placeholder:text-[var(--app-text-faint)] focus:outline-none focus:border-[var(--app-brand)]/40 transition-colors"
-              placeholder="Ask AMoon AI or search" value={search} onChange={e => setSearch(e.target.value)} />
+              placeholder="Search chats, users, messages..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
         </div>
 

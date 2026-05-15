@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "AMoon Eclipse",
-    "slug": "amoon-eclipse",
-    "scheme": "amoon-eclipse",
+    "name": "Veyluro",
+    "slug": "veyluro",
+    "scheme": "veyluro",
     "version": "1.3.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

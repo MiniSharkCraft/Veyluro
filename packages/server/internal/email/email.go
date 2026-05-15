@@ -71,13 +71,13 @@ func (s *Sender) Send(to, subject, html string) error {
 
 func (s *Sender) SendOTP(to, otp string) error {
 	html := fmt.Sprintf(`
-<div style="font-family:sans-serif;max-width:400px;margin:40px auto;background:#0E0E1C;color:#F1F5F9;padding:32px;border-radius:16px;border:1px solid #1E1E30">
-  <h2 style="color:#818CF8;margin:0 0 8px">🌙 AMoon Eclipse</h2>
+<div style="font-family:sans-serif;max-width:400px;margin:40px auto;background:#0B1724;color:#EAF4FF;padding:32px;border-radius:16px;border:1px solid #1B2F43">
+  <h2 style="color:#20C7B3;margin:0 0 8px">🌊 Veyluro</h2>
   <p style="color:#64748B;margin:0 0 24px;font-size:13px">Đặt lại mật khẩu</p>
   <p style="margin:0 0 16px">Mã OTP của bạn:</p>
-  <div style="background:#1E1B4B;border-radius:12px;padding:20px;text-align:center;letter-spacing:8px;font-size:32px;font-weight:700;color:#818CF8">%s</div>
+  <div style="background:#133149;border-radius:12px;padding:20px;text-align:center;letter-spacing:8px;font-size:32px;font-weight:700;color:#20C7B3">%s</div>
   <p style="color:#64748B;font-size:12px;margin:16px 0 0">Mã có hiệu lực trong <strong>10 phút</strong>. Nếu bạn không yêu cầu, bỏ qua email này.</p>
 </div>`, otp)
 
-	return s.Send(to, "Mã OTP đặt lại mật khẩu — AMoon Eclipse", html)
+	return s.Send(to, "Mã OTP đặt lại mật khẩu — Veyluro", html)
 }

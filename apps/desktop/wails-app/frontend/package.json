@@ -1,6 +1,6 @@
 {
   "name": "amoon-eclipse-desktop-frontend",
-  "version": "1.3.2",
+  "version": "1.6.0",
   "private": true,
   "scripts": {
     "dev": "vite",

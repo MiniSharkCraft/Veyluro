@@ -17,7 +17,7 @@ func main() {
 	app := NewApp()
 
 	err := wails.Run(&options.App{
-		Title:     "AMoon Eclipse",
+		Title:     "Veyluro",
 		Width:     1280,
 		Height:    800,
 		MinWidth:  800,

@@ -105,7 +105,7 @@ export default function FriendsScreen() {
 
   const handleShareInvite = async () => {
     if (!inviteLink) return
-    try { await Share.share({ message: `Kết bạn với tôi trên AMoon Eclipse!\n${inviteLink}` }) }
+    try { await Share.share({ message: `Kết bạn với tôi trên Veyluro!\n${inviteLink}` }) }
     catch { /* ignore */ }
   }
 
@@ -134,7 +134,7 @@ export default function FriendsScreen() {
       <StatusBar barStyle="light-content" backgroundColor="#08080F" />
 
       <View style={s.header}>
-        <Text style={s.headerSub}>AMoon Eclipse</Text>
+        <Text style={s.headerSub}>Veyluro</Text>
         <Text style={s.headerTitle}>Bạn bè</Text>
       </View>
 
@@ -155,16 +155,16 @@ export default function FriendsScreen() {
         <FlatList
           data={friends}
           keyExtractor={i => i.id}
-          refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchAll} tintColor="#6366F1" />}
+          refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchAll} tintColor="#0FA79A" />}
           contentContainerStyle={{ paddingBottom: 20 }}
           ListEmptyComponent={
             !loading ? (
               <View style={s.empty}>
-                <UsersThreeIcon size={44} color="#374151" weight="duotone" />
+                <UsersThreeIcon size={44} color="#4E677F" weight="duotone" />
                 <Text style={s.emptyTxt}>Chưa có bạn bè nào</Text>
                 <Text style={s.emptySub}>Tìm người bạn quen ở tab "Tìm kiếm"</Text>
               </View>
-            ) : <ActivityIndicator color="#6366F1" style={{ marginTop: 40 }} />
+            ) : <ActivityIndicator color="#0FA79A" style={{ marginTop: 40 }} />
           }
           renderItem={({ item }: { item: FriendType }) => (
             <View style={s.row}>
@@ -180,8 +180,8 @@ export default function FriendsScreen() {
                   disabled={dmLoading === item.username}
                 >
                   {dmLoading === item.username
-                    ? <ActivityIndicator color="#818CF8" size="small" />
-                    : <ChatCircleIcon size={18} color="#A5B4FC" weight="bold" />
+                    ? <ActivityIndicator color="#20C7B3" size="small" />
+                    : <ChatCircleIcon size={18} color="#7EDCD2" weight="bold" />
                   }
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => removeFriend(item.friendId, item.username)} style={s.removeBtn}>
@@ -197,15 +197,15 @@ export default function FriendsScreen() {
         <FlatList
           data={requests}
           keyExtractor={i => i.id}
-          refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchAll} tintColor="#6366F1" />}
+          refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchAll} tintColor="#0FA79A" />}
           contentContainerStyle={{ paddingBottom: 20 }}
           ListEmptyComponent={
             !loading ? (
               <View style={s.empty}>
-                <EnvelopeSimpleIcon size={44} color="#374151" weight="duotone" />
+                <EnvelopeSimpleIcon size={44} color="#4E677F" weight="duotone" />
                 <Text style={s.emptyTxt}>Không có lời mời nào</Text>
               </View>
-            ) : <ActivityIndicator color="#6366F1" style={{ marginTop: 40 }} />
+            ) : <ActivityIndicator color="#0FA79A" style={{ marginTop: 40 }} />
           }
           renderItem={({ item }: { item: FriendRequestType }) => (
             <View style={s.row}>
@@ -221,8 +221,8 @@ export default function FriendsScreen() {
                   disabled={actionId === item.id}
                 >
                   {actionId === item.id
-                    ? <ActivityIndicator color="#818CF8" size="small" />
-                    : <CheckIcon size={18} color="#A5B4FC" weight="bold" />
+                    ? <ActivityIndicator color="#20C7B3" size="small" />
+                    : <CheckIcon size={18} color="#7EDCD2" weight="bold" />
                   }
                 </TouchableOpacity>
                 <TouchableOpacity style={s.rejectBtn} onPress={() => declineRequest(item.id)}>
@@ -239,7 +239,7 @@ export default function FriendsScreen() {
           {/* Invite link banner */}
           <View style={s.inviteBox}>
             <View style={s.inviteTitleRow}>
-              <LinkIcon size={17} color="#818CF8" weight="bold" />
+              <LinkIcon size={17} color="#20C7B3" weight="bold" />
               <Text style={s.inviteTitle}>Link kết bạn của bạn</Text>
             </View>
             {inviteLink ? (
@@ -249,20 +249,20 @@ export default function FriendsScreen() {
                   <TouchableOpacity style={s.inviteBtn} onPress={async () => { try { await Share.share({ message: inviteLink }) } catch { /* */ } }}>
                     <Text style={s.inviteBtnTxt}>Copy</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[s.inviteBtn, { backgroundColor: '#1E1B4B' }]} onPress={handleShareInvite}>
-                    <Text style={[s.inviteBtnTxt, { color: '#818CF8' }]}>Chia sẻ</Text>
+                  <TouchableOpacity style={[s.inviteBtn, { backgroundColor: '#133149' }]} onPress={handleShareInvite}>
+                    <Text style={[s.inviteBtnTxt, { color: '#20C7B3' }]}>Chia sẻ</Text>
                   </TouchableOpacity>
                 </View>
               </>
             ) : (
               <TouchableOpacity style={s.inviteGenBtn} onPress={handleGetInviteLink} disabled={inviteLoading}>
-                {inviteLoading ? <ActivityIndicator color="#818CF8" size="small" /> : <Text style={s.inviteGenTxt}>Tạo link kết bạn</Text>}
+                {inviteLoading ? <ActivityIndicator color="#20C7B3" size="small" /> : <Text style={s.inviteGenTxt}>Tạo link kết bạn</Text>}
               </TouchableOpacity>
             )}
           </View>
 
           <View style={s.findSearch}>
-            <MagnifyingGlassIcon size={18} color="#4B5563" weight="bold" />
+            <MagnifyingGlassIcon size={18} color="#6D8298" weight="bold" />
             <TextInput
               style={s.searchInput}
               placeholder="Tìm theo username..."
@@ -280,7 +280,7 @@ export default function FriendsScreen() {
             ListEmptyComponent={
               search.trim() ? (
                 <View style={s.empty}>
-                  <MagnifyingGlassIcon size={44} color="#374151" weight="duotone" />
+                  <MagnifyingGlassIcon size={44} color="#4E677F" weight="duotone" />
                   <Text style={s.emptyTxt}>Không tìm thấy ai</Text>
                 </View>
               ) : (
@@ -301,8 +301,8 @@ export default function FriendsScreen() {
                   disabled={actionId === item.username}
                 >
                   {actionId === item.username
-                    ? <ActivityIndicator color="#818CF8" size="small" />
-                    : <View style={s.addBtnInner}><UserPlusIcon size={14} color="#818CF8" weight="bold" /><Text style={s.addBtnTxt}>Thêm</Text></View>
+                    ? <ActivityIndicator color="#20C7B3" size="small" />
+                    : <View style={s.addBtnInner}><UserPlusIcon size={14} color="#20C7B3" weight="bold" /><Text style={s.addBtnTxt}>Thêm</Text></View>
                   }
                 </TouchableOpacity>
               </View>
@@ -317,39 +317,39 @@ export default function FriendsScreen() {
 const s = StyleSheet.create({
   root:        { flex: 1, backgroundColor: '#08080F' },
   header:      { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 },
-  headerSub:   { color: '#6366F1', fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
+  headerSub:   { color: '#0FA79A', fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
   headerTitle: { color: '#F1F5F9', fontSize: 24, fontWeight: '800' },
   subtabRow:   { flexDirection: 'row', paddingHorizontal: 16, marginBottom: 8, gap: 8 },
-  subtab:      { flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center', backgroundColor: '#12121E' },
-  subtabOn:    { backgroundColor: '#1E1B4B' },
-  subtabTxt:   { color: '#4B5563', fontSize: 12, fontWeight: '600' },
-  subtabTxtOn: { color: '#818CF8' },
+  subtab:      { flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center', backgroundColor: '#102131' },
+  subtabOn:    { backgroundColor: '#133149' },
+  subtabTxt:   { color: '#6D8298', fontSize: 12, fontWeight: '600' },
+  subtabTxtOn: { color: '#20C7B3' },
   row:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
   avatar:      { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  avatarImg:   { width: 48, height: 48, borderRadius: 24, marginRight: 12, backgroundColor: '#12121E' },
+  avatarImg:   { width: 48, height: 48, borderRadius: 24, marginRight: 12, backgroundColor: '#102131' },
   avatarTxt:   { color: '#fff', fontSize: 18, fontWeight: '700' },
   rowInfo:     { flex: 1 },
   rowName:     { color: '#F1F5F9', fontSize: 15, fontWeight: '600' },
   rowSub:      { color: '#64748B', fontSize: 13, marginTop: 2 },
-  msgBtn:      { backgroundColor: '#1E1B4B', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, minWidth: 36, alignItems: 'center' },
+  msgBtn:      { backgroundColor: '#133149', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, minWidth: 36, alignItems: 'center' },
   removeBtn:   { backgroundColor: '#1A0A0A', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   removeBtnTxt:{ color: '#EF4444', fontSize: 12, fontWeight: '600' },
-  acceptBtn:   { width: 36, height: 36, borderRadius: 18, backgroundColor: '#1E1B4B', alignItems: 'center', justifyContent: 'center' },
+  acceptBtn:   { width: 36, height: 36, borderRadius: 18, backgroundColor: '#133149', alignItems: 'center', justifyContent: 'center' },
   rejectBtn:   { width: 36, height: 36, borderRadius: 18, backgroundColor: '#1A0A0A', alignItems: 'center', justifyContent: 'center' },
-  addBtn:      { backgroundColor: '#1E1B4B', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, minWidth: 78, alignItems: 'center' },
+  addBtn:      { backgroundColor: '#133149', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, minWidth: 78, alignItems: 'center' },
   addBtnInner: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  addBtnTxt:   { color: '#818CF8', fontSize: 13, fontWeight: '700' },
+  addBtnTxt:   { color: '#20C7B3', fontSize: 13, fontWeight: '700' },
   inviteBox:    { marginHorizontal: 16, marginBottom: 12, backgroundColor: '#0E0E1C', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#1E3A5F' },
   inviteTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  inviteTitle:  { color: '#818CF8', fontSize: 14, fontWeight: '700' },
-  inviteLinkTxt:{ color: '#6366F1', fontSize: 12, fontFamily: 'monospace', marginBottom: 4 },
-  inviteBtn:    { flex: 1, backgroundColor: '#12121E', borderRadius: 10, paddingVertical: 9, alignItems: 'center', borderWidth: 1, borderColor: '#1E1E30' },
+  inviteTitle:  { color: '#20C7B3', fontSize: 14, fontWeight: '700' },
+  inviteLinkTxt:{ color: '#0FA79A', fontSize: 12, fontFamily: 'monospace', marginBottom: 4 },
+  inviteBtn:    { flex: 1, backgroundColor: '#102131', borderRadius: 10, paddingVertical: 9, alignItems: 'center', borderWidth: 1, borderColor: '#1B2F43' },
   inviteBtnTxt: { color: '#94A3B8', fontSize: 13, fontWeight: '600' },
-  inviteGenBtn: { backgroundColor: '#1E1B4B', borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginTop: 4 },
-  inviteGenTxt: { color: '#818CF8', fontSize: 13, fontWeight: '600' },
-  findSearch:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#12121E', marginHorizontal: 16, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 8 },
+  inviteGenBtn: { backgroundColor: '#133149', borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginTop: 4 },
+  inviteGenTxt: { color: '#20C7B3', fontSize: 13, fontWeight: '600' },
+  findSearch:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#102131', marginHorizontal: 16, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 8 },
   searchInput: { flex: 1, color: '#F1F5F9', fontSize: 15, marginLeft: 8 },
   empty:       { alignItems: 'center', paddingTop: 60, paddingHorizontal: 40 },
-  emptyTxt:    { color: '#4B5563', fontSize: 15, marginBottom: 6 },
-  emptySub:    { color: '#374151', fontSize: 13, textAlign: 'center' },
+  emptyTxt:    { color: '#6D8298', fontSize: 15, marginBottom: 6 },
+  emptySub:    { color: '#4E677F', fontSize: 13, textAlign: 'center' },
 })

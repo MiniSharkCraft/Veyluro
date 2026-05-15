@@ -6,28 +6,28 @@
 
 @layer base {
   :root {
-    --app-bg: #ffffff;
-    --app-panel: #f5f6f8;
-    --app-panel-2: #ebeef3;
-    --app-border-soft: #e5e7eb;
-    --app-text: #09090b;
-    --app-text-soft: #5f6570;
-    --app-text-faint: #8a8f99;
-    --app-brand: #6d28d9;
-    --app-brand-soft: #efe7ff;
+    --app-bg: #050a12;
+    --app-panel: #0a1424;
+    --app-panel-2: #0f1c31;
+    --app-border-soft: #1a2c47;
+    --app-text: #eaf4ff;
+    --app-text-soft: #9eb3c8;
+    --app-text-faint: #7390ac;
+    --app-brand: #2ec5ff;
+    --app-brand-soft: #12314f;
   }
 
   @media (prefers-color-scheme: dark) {
     :root {
-      --app-bg: #000000;
-      --app-panel: #171717;
-      --app-panel-2: #242424;
-      --app-border-soft: #262626;
-      --app-text: #f8fafc;
-      --app-text-soft: #a3a3a3;
-      --app-text-faint: #737373;
-      --app-brand: #8b5cf6;
-      --app-brand-soft: #2e2254;
+      --app-bg: #050a12;
+      --app-panel: #0a1424;
+      --app-panel-2: #0f1c31;
+      --app-border-soft: #1a2c47;
+      --app-text: #eaf4ff;
+      --app-text-soft: #9eb3c8;
+      --app-text-faint: #7390ac;
+      --app-brand: #2ec5ff;
+      --app-brand-soft: #12314f;
     }
   }
 
@@ -48,7 +48,7 @@
   }
 
   body {
-    background: #08080F;
+    background: radial-gradient(1200px 600px at 10% -10%, #12314f 0%, #050a12 48%), #050a12;
     color: #F1F5F9;
     font-family: Inter, system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;

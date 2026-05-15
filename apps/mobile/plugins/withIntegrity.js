@@ -1,5 +1,5 @@
 /**
- * Expo Config Plugin — AMoon Eclipse iOS Integrity Module
+ * Expo Config Plugin — Veyluro iOS Integrity Module
  *
  * Runs during `expo prebuild` / EAS Build:
  *   1. Copies ios/IntegrityModule.mm into the generated Xcode project

@@ -43,7 +43,7 @@ export function useGroupCall(
 
   const getIceServers = useCallback(async () => {
     try {
-      const token = await SecureStore.getItemAsync('amoon_token')
+      const token = await SecureStore.getItemAsync('veyluro_token')
       const res = await fetch(`${API}/api/calls/turn-credentials`, {
         headers: { Authorization: `Bearer ${token}` },
       })

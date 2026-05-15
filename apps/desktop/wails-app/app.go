@@ -13,7 +13,7 @@ func NewApp() *App { return &App{} }
 
 func (a *App) startup(ctx context.Context) { a.ctx = ctx }
 
-func (a *App) AppName() string { return "AMoon Eclipse" }
+func (a *App) AppName() string { return "Veyluro" }
 
 func (a *App) StartGoogleOAuth(apiBase string) error {
 	_ = apiBase

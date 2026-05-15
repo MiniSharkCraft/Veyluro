@@ -1,6 +1,6 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- schema.sql — AMoon Eclipse · Cloudflare D1
--- Chạy: wrangler d1 execute amoon-eclipse-db --file=./schema.sql
+-- schema.sql — Veyluro · Cloudflare D1
+-- Chạy: wrangler d1 execute veyluro-db --file=./schema.sql
 --
 -- Bảo mật:
 --   - email_enc: AES-256-GCM encrypted (key = DB_ENCRYPTION_KEY secret)

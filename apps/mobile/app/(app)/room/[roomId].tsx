@@ -322,7 +322,7 @@ export default function RoomScreen() {
       {/* Header */}
       <View style={[s.header, { paddingTop: Math.max(insets.top, 8) + 6 }]}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
-          <ArrowLeftIcon size={24} color="#818CF8" weight="bold" />
+          <ArrowLeftIcon size={24} color="#20C7B3" weight="bold" />
         </TouchableOpacity>
 
         {roomType === 'group' ? (
@@ -333,8 +333,8 @@ export default function RoomScreen() {
               resizeMode="cover"
             />
           ) : (
-            <View style={[s.avatar, { backgroundColor: '#1E1B4B' }]}>
-              <UsersThreeIcon size={20} color="#A5B4FC" weight="fill" />
+            <View style={[s.avatar, { backgroundColor: '#133149' }]}>
+              <UsersThreeIcon size={20} color="#7EDCD2" weight="fill" />
             </View>
           )
         ) : (
@@ -372,7 +372,7 @@ export default function RoomScreen() {
           }}
             activeOpacity={0.7}
           >
-            <PhoneIcon size={19} color="#A5B4FC" weight="bold" />
+            <PhoneIcon size={19} color="#7EDCD2" weight="bold" />
           </TouchableOpacity>
         )}
 
@@ -383,20 +383,20 @@ export default function RoomScreen() {
             onPress={() => myUsername && startGroupCall(roomId, myUsername)}
             activeOpacity={0.7}
           >
-            <PhoneIcon size={19} color="#A5B4FC" weight="bold" />
+            <PhoneIcon size={19} color="#7EDCD2" weight="bold" />
           </TouchableOpacity>
         )}
 
         {/* Members list (group) */}
         {roomType === 'group' && (
           <TouchableOpacity style={s.headerBtn} onPress={() => setMemberModal(true)} activeOpacity={0.7}>
-            <UserIcon size={19} color="#A5B4FC" weight="bold" />
+            <UserIcon size={19} color="#7EDCD2" weight="bold" />
           </TouchableOpacity>
         )}
 
         {/* Menu */}
         <TouchableOpacity style={s.headerBtn} onPress={() => setMenuModal(true)} activeOpacity={0.7}>
-          <DotsThreeVerticalIcon size={21} color="#A5B4FC" weight="bold" />
+          <DotsThreeVerticalIcon size={21} color="#7EDCD2" weight="bold" />
         </TouchableOpacity>
       </View>
 
@@ -505,7 +505,7 @@ export default function RoomScreen() {
                   autoCapitalize="none"
                 />
                 <TouchableOpacity style={bm.addBtn} onPress={handleAddMember}>
-                  <UserPlusIcon size={16} color="#A5B4FC" weight="bold" />
+                  <UserPlusIcon size={16} color="#7EDCD2" weight="bold" />
                 </TouchableOpacity>
               </View>
             )}
@@ -590,7 +590,7 @@ export default function RoomScreen() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {loading ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator color="#6366F1" size="large" />
+            <ActivityIndicator color="#0FA79A" size="large" />
             <Text style={{ color: '#64748B', marginTop: 12, fontSize: 13 }}>Đang tải tin nhắn...</Text>
           </View>
         ) : (
@@ -602,7 +602,7 @@ export default function RoomScreen() {
             onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: false })}
             ListEmptyComponent={
               <View style={{ alignItems: 'center', paddingTop: 60 }}>
-                <Text style={{ color: '#374151', fontSize: 13 }}>Chưa có tin nhắn · Bắt đầu nào</Text>
+                <Text style={{ color: '#4E677F', fontSize: 13 }}>Chưa có tin nhắn · Bắt đầu nào</Text>
               </View>
             }
             renderItem={({ item, index }) => {
@@ -662,8 +662,8 @@ export default function RoomScreen() {
             activeOpacity={0.8}
           >
             {imageSending
-              ? <ActivityIndicator size="small" color="#818CF8" />
-              : <ImageSquareIcon size={21} color="#818CF8" weight="bold" />
+              ? <ActivityIndicator size="small" color="#20C7B3" />
+              : <ImageSquareIcon size={21} color="#20C7B3" weight="bold" />
             }
           </TouchableOpacity>
           <TextInput
@@ -681,7 +681,7 @@ export default function RoomScreen() {
             disabled={!input.trim()}
             activeOpacity={0.8}
           >
-            <PaperPlaneTiltIcon size={19} color={input.trim() ? '#fff' : '#4B5563'} weight="fill" />
+            <PaperPlaneTiltIcon size={19} color={input.trim() ? '#fff' : '#6D8298'} weight="fill" />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -692,7 +692,7 @@ export default function RoomScreen() {
 const mm = StyleSheet.create({
   overlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end', paddingBottom: 40 },
   menu:     { marginHorizontal: 16, backgroundColor: '#0E0E1C', borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#1A1A2E' },
-  item:     { paddingVertical: 16, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#12121E', flexDirection: 'row', alignItems: 'center', gap: 10 },
+  item:     { paddingVertical: 16, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#102131', flexDirection: 'row', alignItems: 'center', gap: 10 },
   itemTxt:  { color: '#F1F5F9', fontSize: 15, fontWeight: '500' },
 })
 
@@ -724,8 +724,8 @@ const bm = StyleSheet.create({
   handle:      { width: 40, height: 4, backgroundColor: '#2E2E45', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   title:       { color: '#F1F5F9', fontSize: 18, fontWeight: '700', marginBottom: 16 },
   addWrap:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  addInput:    { flex: 1, backgroundColor: '#12121E', borderRadius: 10, borderWidth: 1, borderColor: '#1E1E30', color: '#E2E8F0', paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
-  addBtn:      { width: 40, height: 40, borderRadius: 20, backgroundColor: '#1E1B4B', alignItems: 'center', justifyContent: 'center' },
+  addInput:    { flex: 1, backgroundColor: '#102131', borderRadius: 10, borderWidth: 1, borderColor: '#1B2F43', color: '#E2E8F0', paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
+  addBtn:      { width: 40, height: 40, borderRadius: 20, backgroundColor: '#133149', alignItems: 'center', justifyContent: 'center' },
   row:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
   avatar:      { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   avatarImage: { width: 40, height: 40, borderRadius: 20, marginRight: 12, backgroundColor: '#0B1020' },
@@ -734,7 +734,7 @@ const bm = StyleSheet.create({
   reportBtn:   { padding: 8, backgroundColor: '#1C1208', borderRadius: 8 },
   kickBtn:     { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#1A0A0A', borderRadius: 8 },
   kickBtnTxt:  { color: '#EF4444', fontSize: 13, fontWeight: '600' },
-  closeBtn:    { marginTop: 16, backgroundColor: '#12121E', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  closeBtn:    { marginTop: 16, backgroundColor: '#102131', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   closeBtnTxt: { color: '#64748B', fontSize: 15, fontWeight: '600' },
 })
 
@@ -744,13 +744,13 @@ const rm = StyleSheet.create({
   handle:       { width: 40, height: 4, backgroundColor: '#2E2E45', borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
   title:        { color: '#F1F5F9', fontSize: 18, fontWeight: '800', marginBottom: 4 },
   desc:         { color: '#64748B', fontSize: 13, marginBottom: 14 },
-  reasonBtn:    { backgroundColor: '#12121E', borderRadius: 12, paddingVertical: 13, paddingHorizontal: 16, marginBottom: 8, borderWidth: 1.5, borderColor: '#1E1E30' },
+  reasonBtn:    { backgroundColor: '#102131', borderRadius: 12, paddingVertical: 13, paddingHorizontal: 16, marginBottom: 8, borderWidth: 1.5, borderColor: '#1B2F43' },
   reasonBtnOn:  { borderColor: '#EF4444', backgroundColor: '#1C0A0A' },
   reasonTxt:    { color: '#94A3B8', fontSize: 14 },
   reasonTxtOn:  { color: '#EF4444', fontWeight: '600' },
-  input:        { backgroundColor: '#0D0D1A', borderWidth: 1.5, borderColor: '#1E1E30', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, color: '#F1F5F9', fontSize: 14, minHeight: 70, textAlignVertical: 'top', marginTop: 8, marginBottom: 16 },
+  input:        { backgroundColor: '#0B1724', borderWidth: 1.5, borderColor: '#1B2F43', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, color: '#F1F5F9', fontSize: 14, minHeight: 70, textAlignVertical: 'top', marginTop: 8, marginBottom: 16 },
   btnRow:       { flexDirection: 'row', gap: 10 },
-  cancel:       { flex: 1, backgroundColor: '#12121E', borderRadius: 14, paddingVertical: 15, alignItems: 'center', borderWidth: 1, borderColor: '#1E1E30' },
+  cancel:       { flex: 1, backgroundColor: '#102131', borderRadius: 14, paddingVertical: 15, alignItems: 'center', borderWidth: 1, borderColor: '#1B2F43' },
   cancelTxt:    { color: '#64748B', fontSize: 15, fontWeight: '600' },
   confirm:      { flex: 2, backgroundColor: '#EF4444', borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
   confirmTxt:   { color: '#fff', fontSize: 15, fontWeight: '700' },
@@ -758,7 +758,7 @@ const rm = StyleSheet.create({
 
 const s = StyleSheet.create({
   root:        { flex: 1, backgroundColor: '#08080F' },
-  header:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0E0E1C', paddingHorizontal: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#12121E' },
+  header:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0E0E1C', paddingHorizontal: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#102131' },
   backBtn:     { padding: 6, marginRight: 2 },
   avatar:      { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
   avatarImage: { width: 40, height: 40, borderRadius: 20, marginRight: 10, backgroundColor: '#0B1020' },
@@ -769,7 +769,7 @@ const s = StyleSheet.create({
   connDot:     { width: 6, height: 6, borderRadius: 3, marginRight: 5 },
   statusTxt:   { color: '#64748B', fontSize: 12 },
   headerBtn:   { marginLeft: 6, padding: 7 },
-  senderName:  { color: '#6366F1', fontSize: 11, fontWeight: '600', marginBottom: 2, marginLeft: 2 },
+  senderName:  { color: '#0FA79A', fontSize: 11, fontWeight: '600', marginBottom: 2, marginLeft: 2 },
   msgList:     { paddingHorizontal: 12, paddingVertical: 12 },
   msgRow:      { flexDirection: 'row', alignItems: 'flex-end', marginTop: 8 },
   msgLeft:     { justifyContent: 'flex-start' },
@@ -789,10 +789,10 @@ const s = StyleSheet.create({
   meta:        { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 4 },
   metaTime:    { color: 'rgba(241,245,249,0.35)', fontSize: 11 },
   metaTick:    { color: 'rgba(241,245,249,0.35)', fontSize: 11 },
-  metaTickRead:{ color: '#818CF8' },
-  bar:         { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingTop: 10, backgroundColor: '#0E0E1C', borderTopWidth: 1, borderTopColor: '#12121E' },
-  imageBtn:    { width: 40, height: 40, borderRadius: 20, backgroundColor: '#12121E', alignItems: 'center', justifyContent: 'center', marginRight: 8 },
-  input:       { flex: 1, backgroundColor: '#12121E', borderRadius: 22, paddingHorizontal: 16, paddingTop: 11, paddingBottom: 11, color: '#F1F5F9', fontSize: 15, marginRight: 8 },
-  sendBtn:     { width: 40, height: 40, borderRadius: 20, backgroundColor: '#12121E', alignItems: 'center', justifyContent: 'center' },
-  sendBtnOn:   { backgroundColor: '#6366F1' },
+  metaTickRead:{ color: '#20C7B3' },
+  bar:         { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingTop: 10, backgroundColor: '#0E0E1C', borderTopWidth: 1, borderTopColor: '#102131' },
+  imageBtn:    { width: 40, height: 40, borderRadius: 20, backgroundColor: '#102131', alignItems: 'center', justifyContent: 'center', marginRight: 8 },
+  input:       { flex: 1, backgroundColor: '#102131', borderRadius: 22, paddingHorizontal: 16, paddingTop: 11, paddingBottom: 11, color: '#F1F5F9', fontSize: 15, marginRight: 8 },
+  sendBtn:     { width: 40, height: 40, borderRadius: 20, backgroundColor: '#102131', alignItems: 'center', justifyContent: 'center' },
+  sendBtnOn:   { backgroundColor: '#0FA79A' },
 })

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuthStore, API } from '../stores/authStore'
 import { hashPassword } from '../lib/crypto'
 
@@ -6,10 +6,24 @@ import { hashPassword } from '../lib/crypto'
 declare const window: Window & {
   go?: { main: { App: { StartGoogleOAuth: (apiBase: string) => Promise<void> } } }
   runtime?: { EventsOn: (e: string, cb: (data: unknown) => void) => void }
+  grecaptcha?: {
+    ready: (cb: () => void) => void
+    execute: (siteKey: string, opts: { action: string }) => Promise<string>
+  }
 }
 
 type Mode   = 'login' | 'register'
 type Screen = 'main' | 'forgot' | 'reset'
+
+const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined
+const IS_WAILS_DESKTOP = typeof window !== 'undefined' && !!window.go?.main?.App
+
+async function getRecaptchaToken(action: string): Promise<string | undefined> {
+  if (IS_WAILS_DESKTOP) return undefined
+  if (!RECAPTCHA_SITE_KEY || !window.grecaptcha) return undefined
+  await new Promise<void>((resolve) => window.grecaptcha!.ready(resolve))
+  return window.grecaptcha.execute(RECAPTCHA_SITE_KEY, { action })
+}
 
 export function LoginPage() {
   const [mode,   setMode]   = useState<Mode>('login')
@@ -33,13 +47,18 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false)
 
   const { login, register } = useAuthStore()
-  const apiHostLabel = (() => {
-    try {
-      return new URL(API).host
-    } catch {
-      return API
-    }
-  })()
+
+  useEffect(() => {
+    if (IS_WAILS_DESKTOP) return
+    if (!RECAPTCHA_SITE_KEY) return
+    if (document.getElementById('recaptcha-v3-script')) return
+    const script = document.createElement('script')
+    script.id = 'recaptcha-v3-script'
+    script.src = `https://www.google.com/recaptcha/api.js?render=${encodeURIComponent(RECAPTCHA_SITE_KEY)}`
+    script.async = true
+    script.defer = true
+    document.head.appendChild(script)
+  }, [])
 
   const wrap = async (fn: () => Promise<void>) => {
     setError(null); setInfo(null); setLoading(true)
@@ -55,9 +74,11 @@ export function LoginPage() {
         if (!email.trim())       throw new Error('Email is required (for password recovery)')
         if (!passphrase.trim())  throw new Error('Passphrase is required (protects your E2EE keys)')
         if (passphrase !== confirmPassphrase) throw new Error('Passphrases do not match')
-        await register(username, email, password, passphrase)
+        const recaptchaToken = await getRecaptchaToken('register')
+        await register(username, email, password, passphrase, recaptchaToken)
       } else {
-        await login(username, password, totpCode)
+        const recaptchaToken = await getRecaptchaToken('login')
+        await login(username, password, totpCode, recaptchaToken)
       }
     })
   }
@@ -66,9 +87,11 @@ export function LoginPage() {
   const submitForgotEmail = (e: React.FormEvent) => {
     e.preventDefault()
     wrap(async () => {
+      const recaptchaToken = await getRecaptchaToken('forgot_password')
       const res = await fetch(`${API}/api/auth/forgot-password`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: fpEmail }),
+        method: 'POST',
+        headers: IS_WAILS_DESKTOP ? { 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json', 'X-Client-Platform': 'web' },
+        body: JSON.stringify({ email: fpEmail, recaptchaToken }),
       })
       if (!res.ok) throw new Error((await res.json()).error)
       setInfo('OTP sent! Check your inbox (expires in 10 min).')
@@ -80,9 +103,11 @@ export function LoginPage() {
     e.preventDefault()
     wrap(async () => {
       const passwordHash = await hashPassword(fpNewPass)
+      const recaptchaToken = await getRecaptchaToken('reset_password')
       const res = await fetch(`${API}/api/auth/reset-password`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: fpEmail, otp: fpOtp, password: passwordHash }),
+        method: 'POST',
+        headers: IS_WAILS_DESKTOP ? { 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json', 'X-Client-Platform': 'web' },
+        body: JSON.stringify({ email: fpEmail, otp: fpOtp, password: passwordHash, recaptchaToken }),
       })
       if (!res.ok) throw new Error((await res.json()).error)
       setInfo('Password reset! You can now log in.')
@@ -110,8 +135,8 @@ export function LoginPage() {
               <div className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-neon-cyan animate-pulse-neon" />
             </div>
             <div>
-              <p className="text-neon-cyan text-lg font-bold tracking-wider leading-none">AMoon</p>
-              <p className="text-neon-magenta text-xs tracking-[0.3em] leading-none mt-0.5">ECLIPSE</p>
+              <p className="text-neon-cyan text-lg font-bold tracking-wider leading-none">Veyluro</p>
+              <p className="text-neon-magenta text-xs tracking-[0.3em] leading-none mt-0.5">WATER • DRAGON</p>
             </div>
           </div>
 
@@ -119,7 +144,7 @@ export function LoginPage() {
             Secure.<br/>Private.<br/>Encrypted.
           </h1>
           <p className="text-dark-400 text-sm leading-relaxed">
-            End-to-end encrypted messenger. Your keys never leave your device — not even we can read your messages.
+            End-to-end encrypted messenger. Water-calm flow, dragon-grade protection for every private message.
           </p>
         </div>
 
@@ -140,7 +165,7 @@ export function LoginPage() {
         </div>
 
         {/* Version */}
-        <p className="text-dark-400/50 text-xs">v0.1.0 · {apiHostLabel}</p>
+        <p className="text-dark-400/50 text-xs">v1.6.0</p>
       </div>
 
       {/* ── Right: Form panel ─────────────────────────────────────────────── */}

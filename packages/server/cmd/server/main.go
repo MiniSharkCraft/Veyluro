@@ -88,6 +88,7 @@ func main() {
 		cfg.GoogleRedirectURI,
 		cfg.OAuthAppRedirect,
 		cfg.FacebookAppID,
+		cfg.RecaptchaSecretKey,
 		mailer,
 	)
 	r2Client := r2.New(r2.Config{
@@ -224,7 +225,7 @@ func main() {
 
 	// Graceful shutdown
 	go func() {
-		log.Printf("🌙 AMoon Eclipse server running on :%s", cfg.Port)
+		log.Printf("🌙 Veyluro server running on :%s", cfg.Port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("server error: %v", err)
 		}

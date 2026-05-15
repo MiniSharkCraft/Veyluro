@@ -58,11 +58,11 @@ export default function StoriesScreen() {
 
       <View style={s.header}>
         <View>
-          <Text style={s.headerSub}>AMoon Eclipse</Text>
+          <Text style={s.headerSub}>Veyluro</Text>
           <Text style={s.headerTitle}>Stories</Text>
         </View>
         <TouchableOpacity style={s.addBtn} onPress={() => setNewModal(true)} activeOpacity={0.7}>
-          <PlusIcon size={14} color="#818CF8" weight="bold" />
+          <PlusIcon size={14} color="#20C7B3" weight="bold" />
           <Text style={s.addBtnTxt}>Story</Text>
         </TouchableOpacity>
       </View>
@@ -90,18 +90,18 @@ export default function StoriesScreen() {
       <FlatList
         data={stories}
         keyExtractor={i => i.id}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchStories} tintColor="#6366F1" />}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchStories} tintColor="#0FA79A" />}
         contentContainerStyle={{ paddingBottom: 20 }}
         ListEmptyComponent={
           !loading ? (
             <View style={s.empty}>
-              <BookOpenIcon size={48} color="#374151" weight="duotone" />
+              <BookOpenIcon size={48} color="#4E677F" weight="duotone" />
               <Text style={s.emptyTxt}>Chưa có story nào</Text>
               <TouchableOpacity style={s.emptyCreateBtn} onPress={() => setNewModal(true)} activeOpacity={0.8}>
                 <Text style={s.emptyCreateBtnTxt}>Tạo story đầu tiên</Text>
               </TouchableOpacity>
             </View>
-          ) : <ActivityIndicator color="#6366F1" style={{ marginTop: 40 }} />
+          ) : <ActivityIndicator color="#0FA79A" style={{ marginTop: 40 }} />
         }
         renderItem={({ item }: { item: StoryType }) => (
           <TouchableOpacity style={[s.row, active?.id === item.id && s.rowActive]} onPress={() => setActive(item)} activeOpacity={0.7}>
@@ -158,46 +158,46 @@ export default function StoriesScreen() {
 const s = StyleSheet.create({
   root:            { flex: 1, backgroundColor: '#08080F' },
   header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 },
-  headerSub:       { color: '#6366F1', fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
+  headerSub:       { color: '#0FA79A', fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
   headerTitle:     { color: '#F1F5F9', fontSize: 24, fontWeight: '800' },
-  addBtn:          { backgroundColor: '#1E1B4B', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  addBtnTxt:       { color: '#818CF8', fontSize: 13, fontWeight: '700' },
+  addBtn:          { backgroundColor: '#133149', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  addBtnTxt:       { color: '#20C7B3', fontSize: 13, fontWeight: '700' },
   viewer:          { marginHorizontal: 16, marginBottom: 12 },
-  viewerCard:      { backgroundColor: '#12121E', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#1E1B4B' },
+  viewerCard:      { backgroundColor: '#102131', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#133149' },
   viewerTop:       { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 12 },
   viewerAuthor:    { color: '#F1F5F9', fontSize: 14, fontWeight: '700' },
   viewerTime:      { color: '#64748B', fontSize: 12, marginTop: 2 },
   viewerContent:   { color: '#E2E8F0', fontSize: 16, lineHeight: 24, marginBottom: 12 },
-  viewerDismiss:   { color: '#374151', fontSize: 11, textAlign: 'center' },
-  meBadge:         { backgroundColor: '#1E1B4B', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginLeft: 'auto' },
-  meBadgeTxt:      { color: '#818CF8', fontSize: 11, fontWeight: '700' },
+  viewerDismiss:   { color: '#4E677F', fontSize: 11, textAlign: 'center' },
+  meBadge:         { backgroundColor: '#133149', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginLeft: 'auto' },
+  meBadgeTxt:      { color: '#20C7B3', fontSize: 11, fontWeight: '700' },
   row:             { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
-  rowActive:       { backgroundColor: '#12121E' },
+  rowActive:       { backgroundColor: '#102131' },
   ringWrap:        { marginRight: 12 },
-  ring:            { borderRadius: 30, padding: 2.5, borderWidth: 2, borderColor: '#1E1E30' },
-  ringMine:        { borderColor: '#6366F1' },
+  ring:            { borderRadius: 30, padding: 2.5, borderWidth: 2, borderColor: '#1B2F43' },
+  ringMine:        { borderColor: '#0FA79A' },
   avatar:          { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   avatarTxt:       { color: '#fff', fontSize: 18, fontWeight: '700' },
   rowInfo:         { flex: 1 },
   rowName:         { color: '#F1F5F9', fontSize: 15, fontWeight: '600', marginBottom: 3 },
   rowPreview:      { color: '#64748B', fontSize: 13, marginBottom: 2 },
-  rowTime:         { color: '#374151', fontSize: 11 },
+  rowTime:         { color: '#4E677F', fontSize: 11 },
   empty:           { alignItems: 'center', paddingTop: 60, paddingHorizontal: 40 },
-  emptyTxt:        { color: '#4B5563', fontSize: 15, marginBottom: 20 },
-  emptyCreateBtn:  { backgroundColor: '#1E1B4B', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },
-  emptyCreateBtnTxt:{ color: '#818CF8', fontSize: 14, fontWeight: '700' },
+  emptyTxt:        { color: '#6D8298', fontSize: 15, marginBottom: 20 },
+  emptyCreateBtn:  { backgroundColor: '#133149', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },
+  emptyCreateBtnTxt:{ color: '#20C7B3', fontSize: 14, fontWeight: '700' },
 })
 
 const m = StyleSheet.create({
   overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  sheet:      { backgroundColor: '#12121E', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 36 },
+  sheet:      { backgroundColor: '#102131', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 36 },
   title:      { color: '#F1F5F9', fontSize: 18, fontWeight: '700', marginBottom: 4 },
   subtitle:   { color: '#64748B', fontSize: 13, marginBottom: 16 },
-  input:      { backgroundColor: '#0D0D1A', borderWidth: 1.5, borderColor: '#1E1E30', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, color: '#F1F5F9', fontSize: 15, marginBottom: 6 },
-  charCount:  { color: '#374151', fontSize: 11, textAlign: 'right', marginBottom: 16 },
+  input:      { backgroundColor: '#0B1724', borderWidth: 1.5, borderColor: '#1B2F43', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, color: '#F1F5F9', fontSize: 15, marginBottom: 6 },
+  charCount:  { color: '#4E677F', fontSize: 11, textAlign: 'right', marginBottom: 16 },
   btnRow:     { flexDirection: 'row', gap: 10 },
-  cancel:     { flex: 1, backgroundColor: '#1E1E30', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  cancel:     { flex: 1, backgroundColor: '#1B2F43', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   cancelTxt:  { color: '#64748B', fontSize: 15, fontWeight: '600' },
-  confirm:    { flex: 1, backgroundColor: '#6366F1', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  confirm:    { flex: 1, backgroundColor: '#0FA79A', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   confirmTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
 })

@@ -1,22 +1,23 @@
 # Changelog
 
-## v1.5.0 - 2026-05-14
+## 1.6.0 - 2026-05-15
 
-### Added
-- Added Wails desktop release targets for Linux portable, Windows portable, and Windows installer builds.
-- Added static website release output for users who cannot install a desktop build.
-- Added a mobile TextDecoder polyfill so Hermes/Android can handle UTF-16LE decoding paths.
+- Rebrand toàn bộ app sang `Veyluro` (desktop + mobile + server-facing naming updates).
+- Nâng cấp Wails desktop:
+  - đổi app title/output sang `Veyluro`
+  - cập nhật UI style theo theme `water + dragon`
+  - chuẩn hóa login/footer version hiển thị `v1.6.0`
+- Cập nhật mobile RN:
+  - đồng bộ UI các tab/chats/settings
+  - cải thiện call/group-call components và flow runtime config
+  - chuẩn hóa Android release/build config cho pipeline VPS
+- Cập nhật server:
+  - thêm reCAPTCHA verification cho auth endpoints (web-only)
+  - giữ tương thích mobile/desktop bằng phân biệt platform header
+  - cập nhật schema/handler liên quan auth, room/user flow
+- Đồng bộ web bundle public vào `packages/server/cmd/server/web`.
+- Dọn repo public: loại bỏ file nhạy cảm và artifacts build nặng.
 
-### Changed
-- Synced the public source package from the VPS build tree with generated outputs removed.
-- Hardened the Android release build order so Reanimated waits for Worklets prefab generation.
-- Gated the E2EE fingerprint debug dialog behind development mode so release builds do not show it.
+## 1.5.x
 
-### Fixed
-- Fixed Android release builds failing at `:react-native-reanimated:configureCMakeRelWithDebInfo[arm64-v8a]`.
-- Fixed Android startup crashes caused by missing `TextDecoder` encoding support.
-- Fixed the web TypeScript build issue around React Router component typing.
-
-### Public Source Notes
-- Public sync excludes `.env*`, signing keys, certificates, APK/AAB files, release bundles, dependency folders, desktop binaries, and native build caches.
-- Android signing still requires private `AMOON_RELEASE_*` values supplied outside this public tree.
+- Các bản ổn định trước của AMoon Eclipse.

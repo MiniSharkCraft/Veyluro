@@ -44,7 +44,7 @@ export function useVoiceCall(
 
   const getIceServers = useCallback(async () => {
     try {
-      const token = await SecureStore.getItemAsync('amoon_token')
+      const token = await SecureStore.getItemAsync('veyluro_token')
       const res = await fetch(`${API}/api/calls/turn-credentials`, {
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -139,7 +139,7 @@ export function useVoiceCall(
       pcRef.current = pc
       const offer = await pc.createOffer({})
       await pc.setLocalDescription(offer)
-      const myUsername = await SecureStore.getItemAsync('amoon_username')
+      const myUsername = await SecureStore.getItemAsync('veyluro_username')
       sendSignal('call-ring', toUserId, roomId, { offer, fromUsername: myUsername })
     } catch {
       cleanup()

@@ -1,14 +1,28 @@
 import * as SecureStore from 'expo-secure-store'
 import { importRsaPrivateKey } from './crypto'
 
-const mutedKey = (userId: string) => `amoon_muted_users_${userId}`
+const mutedKey = (userId: string) => `veyluro_muted_users_${userId}`
+const legacyMutedKey = (userId: string) => `amoon_muted_users_${userId}`
 const authMethodKey = (userId: string) => `auth_method_${userId}`
 export type AuthMethod = 'pin' | 'passkey'
 
+const TOKEN_KEY = 'veyluro_token'
+const USER_ID_KEY = 'veyluro_userId'
+const USERNAME_KEY = 'veyluro_username'
+const LEGACY_TOKEN_KEY = 'veyluro_token'
+const LEGACY_USER_ID_KEY = 'veyluro_userId'
+const LEGACY_USERNAME_KEY = 'veyluro_username'
+
 export const storage = {
-  getToken:    () => SecureStore.getItemAsync('amoon_token'),
-  getUserId:   () => SecureStore.getItemAsync('amoon_userId'),
-  getUsername: () => SecureStore.getItemAsync('amoon_username'),
+  async getToken() {
+    return (await SecureStore.getItemAsync(TOKEN_KEY)) ?? SecureStore.getItemAsync(LEGACY_TOKEN_KEY)
+  },
+  async getUserId() {
+    return (await SecureStore.getItemAsync(USER_ID_KEY)) ?? SecureStore.getItemAsync(LEGACY_USER_ID_KEY)
+  },
+  async getUsername() {
+    return (await SecureStore.getItemAsync(USERNAME_KEY)) ?? SecureStore.getItemAsync(LEGACY_USERNAME_KEY)
+  },
 
   async getPrivateKey(): Promise<CryptoKey | null> {
     const userId = await this.getUserId()
@@ -29,21 +43,29 @@ export const storage = {
 
   async setSession(userId: string, username: string, token: string) {
     await Promise.all([
-      SecureStore.setItemAsync('amoon_userId', userId),
-      SecureStore.setItemAsync('amoon_username', username),
-      SecureStore.setItemAsync('amoon_token', token),
+      SecureStore.setItemAsync(USER_ID_KEY, userId),
+      SecureStore.setItemAsync(USERNAME_KEY, username),
+      SecureStore.setItemAsync(TOKEN_KEY, token),
+      // legacy compatibility for old app code paths
+      SecureStore.setItemAsync(LEGACY_USER_ID_KEY, userId),
+      SecureStore.setItemAsync(LEGACY_USERNAME_KEY, username),
+      SecureStore.setItemAsync(LEGACY_TOKEN_KEY, token),
     ])
   },
 
   async clear() {
     const userId = await this.getUserId()
     await Promise.all([
-      SecureStore.deleteItemAsync('amoon_token'),
-      SecureStore.deleteItemAsync('amoon_userId'),
-      SecureStore.deleteItemAsync('amoon_username'),
+      SecureStore.deleteItemAsync(TOKEN_KEY),
+      SecureStore.deleteItemAsync(USER_ID_KEY),
+      SecureStore.deleteItemAsync(USERNAME_KEY),
+      SecureStore.deleteItemAsync(LEGACY_TOKEN_KEY),
+      SecureStore.deleteItemAsync(LEGACY_USER_ID_KEY),
+      SecureStore.deleteItemAsync(LEGACY_USERNAME_KEY),
       userId ? SecureStore.deleteItemAsync(`privateKey_${userId}`) : Promise.resolve(),
       userId ? SecureStore.deleteItemAsync(`publicKey_${userId}`) : Promise.resolve(),
       userId ? SecureStore.deleteItemAsync(mutedKey(userId)) : Promise.resolve(),
+      userId ? SecureStore.deleteItemAsync(legacyMutedKey(userId)) : Promise.resolve(),
       userId ? SecureStore.deleteItemAsync(authMethodKey(userId)) : Promise.resolve(),
     ])
   },
@@ -69,7 +91,8 @@ export const storage = {
   async getMutedUserIds(): Promise<string[]> {
     const userId = await this.getUserId()
     if (!userId) return []
-    const raw = await SecureStore.getItemAsync(mutedKey(userId))
+    const raw = (await SecureStore.getItemAsync(mutedKey(userId)))
+      ?? (await SecureStore.getItemAsync(legacyMutedKey(userId)))
     if (!raw) return []
     try {
       const parsed = JSON.parse(raw)

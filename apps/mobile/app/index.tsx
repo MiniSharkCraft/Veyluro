@@ -42,7 +42,7 @@ export default function Index() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#08080F' }}>
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color="#A5B4FC" />
+        <ActivityIndicator color="#7EDCD2" />
       </View>
     </SafeAreaView>
   )

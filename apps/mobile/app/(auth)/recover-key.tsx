@@ -16,7 +16,7 @@ import { API_BASE_URL } from '../../src/lib/runtimeConfig'
 
 const API = API_BASE_URL
 const localPublicKeyKey = (userId: string) => `publicKey_${userId}`
-const RESTORE_SYNC_KEY = 'amoon_restore_sync_pending'
+const RESTORE_SYNC_KEY = 'veyluro_restore_sync_pending'
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 type RestoreStage =
@@ -46,8 +46,8 @@ export default function RecoverKeyScreen() {
     setLoading(true)
     setRestoreStage('verifying', 8, 'Đang kiểm tra backup...')
     try {
-      const token = await SecureStore.getItemAsync('amoon_token')
-      const userId = await SecureStore.getItemAsync('amoon_userId')
+      const token = await SecureStore.getItemAsync('veyluro_token')
+      const userId = await SecureStore.getItemAsync('veyluro_userId')
       if (!token || !userId) throw new Error('Phiên đăng nhập hết hạn')
       await sleep(220)
 
@@ -107,8 +107,8 @@ export default function RecoverKeyScreen() {
 
   const createNewKey = async () => {
     try {
-      const userId = await SecureStore.getItemAsync('amoon_userId')
-      const token = await SecureStore.getItemAsync('amoon_token')
+      const userId = await SecureStore.getItemAsync('veyluro_userId')
+      const token = await SecureStore.getItemAsync('veyluro_token')
       if (!userId || !token) return
       await ensureSignalReady(userId)
       const signalBundle = buildPublicSignalBundle()
@@ -130,9 +130,9 @@ export default function RecoverKeyScreen() {
 
   const handleLogout = async () => {
     await Promise.all([
-      SecureStore.deleteItemAsync('amoon_token'),
-      SecureStore.deleteItemAsync('amoon_userId'),
-      SecureStore.deleteItemAsync('amoon_username'),
+      SecureStore.deleteItemAsync('veyluro_token'),
+      SecureStore.deleteItemAsync('veyluro_userId'),
+      SecureStore.deleteItemAsync('veyluro_username'),
     ])
     router.replace('/(auth)/login')
   }
@@ -169,7 +169,7 @@ export default function RecoverKeyScreen() {
 
         <Text style={s.warn}>Nếu quên passphrase, tin nhắn cũ sẽ không thể đọc lại.</Text>
         <TouchableOpacity onPress={handleLogout} style={{ marginTop: 20, alignItems: 'center' }}>
-          <Text style={{ color: '#374151', fontSize: 13 }}>← Đăng xuất</Text>
+          <Text style={{ color: '#4E677F', fontSize: 13 }}>← Đăng xuất</Text>
         </TouchableOpacity>
       </KeyboardAvoidingView>
 
@@ -196,9 +196,9 @@ const s = StyleSheet.create({
   moonInner: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#08080F' },
   title:     { color: '#F1F5F9', fontSize: 26, fontWeight: '800', textAlign: 'center', marginBottom: 10 },
   sub:       { color: '#64748B', fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 28 },
-  box:       { backgroundColor: '#12121E', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#1E1E30' },
+  box:       { backgroundColor: '#102131', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#1B2F43' },
   label:     { color: '#64748B', fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8 },
-  input:     { backgroundColor: '#0D0D1A', borderWidth: 1.5, borderColor: '#1E1E30', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: '#F1F5F9', fontSize: 15, marginBottom: 16 },
+  input:     { backgroundColor: '#0B1724', borderWidth: 1.5, borderColor: '#1B2F43', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: '#F1F5F9', fontSize: 15, marginBottom: 16 },
   btn:       { backgroundColor: '#0EA5A5', borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
   btnTxt:    { color: '#fff', fontSize: 15, fontWeight: '700' },
   warn:      { color: '#78350F', fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 20, paddingHorizontal: 10 },

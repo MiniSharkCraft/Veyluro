@@ -193,7 +193,7 @@ func RequestIntegrity(cfg IntegrityConfig) func(http.Handler) http.Handler {
 			appSum := r.Header.Get("X-App-Sum")
 			if appSum == "" {
 				integrityError(w, http.StatusForbidden, "MISSING_APP_SUM",
-					"X-App-Sum header required. This API is for official AMoon Eclipse clients only.")
+					"X-App-Sum header required. This API is for official Veyluro clients only.")
 				return
 			}
 			// If EXPECTED_APP_SUMS is configured, enforce strict matching.
@@ -202,7 +202,7 @@ func RequestIntegrity(cfg IntegrityConfig) func(http.Handler) http.Handler {
 				if _, ok := validSums[appSum]; !ok {
 					log.Printf("[integrity] invalid app-sum from %s: %s", ip, appSum)
 					integrityError(w, http.StatusForbidden, "INVALID_APP_SUM",
-						"Ứng dụng của bạn không được công nhận. Vui lòng tải AMoon Eclipse từ nguồn chính thức. / Malicious clone or tampered APK detected.")
+						"Ứng dụng của bạn không được công nhận. Vui lòng tải Veyluro từ nguồn chính thức. / Malicious clone or tampered APK detected.")
 					return
 				}
 			}

@@ -28,7 +28,7 @@ import { usersApi, blocksApi, type ProfileType, type BlockedUserType } from '../
 import { storage } from '../../src/lib/storage'
 import { decideUpdate, fetchUpdateInfo, type UpdateDecision } from '../../src/lib/update'
 
-const UPDATE_SKIP_KEY = 'amoon_skip_update_version'
+const UPDATE_SKIP_KEY = 'veyluro_skip_update_version'
 
 function getCurrentAppVersion(): string {
   if (Constants.appOwnership === 'expo') {
@@ -259,7 +259,7 @@ export default function SettingsScreen() {
 
   const handleShareInvite = async () => {
     if (!inviteLink) return
-    try { await Share.share({ message: `Kết bạn với tôi trên AMoon Eclipse: ${inviteLink}` }) }
+    try { await Share.share({ message: `Kết bạn với tôi trên Veyluro: ${inviteLink}` }) }
     catch { /* ignore */ }
   }
 
@@ -351,7 +351,7 @@ export default function SettingsScreen() {
   if (loading) return (
     <SafeAreaView style={s.root}>
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color="#6366F1" />
+        <ActivityIndicator color="#0FA79A" />
       </View>
     </SafeAreaView>
   )
@@ -363,7 +363,7 @@ export default function SettingsScreen() {
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <ArrowLeftIcon size={23} color="#A5B4FC" weight="bold" />
+          <ArrowLeftIcon size={23} color="#7EDCD2" weight="bold" />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Cài đặt</Text>
         <View style={{ width: 36 }} />
@@ -377,7 +377,7 @@ export default function SettingsScreen() {
             {profile?.avatarUrl ? (
               <Image source={{ uri: profile.avatarThumbUrl || profile.avatarUrl, cache: 'force-cache' }} style={s.bigAvatarImg} />
             ) : (
-              <View style={[s.bigAvatar, { backgroundColor: '#1E1B4B' }]}>
+              <View style={[s.bigAvatar, { backgroundColor: '#133149' }]}>
                 <Text style={s.bigAvatarTxt}>{(profile?.displayName ?? profile?.username ?? '?')[0]?.toUpperCase()}</Text>
               </View>
             )}
@@ -418,8 +418,8 @@ export default function SettingsScreen() {
                 <TouchableOpacity style={s.inviteActionBtn} onPress={handleCopyInvite}>
                   <Text style={s.inviteActionTxt}>Copy</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[s.inviteActionBtn, { backgroundColor: '#1E1B4B' }]} onPress={handleShareInvite}>
-                  <Text style={[s.inviteActionTxt, { color: '#818CF8' }]}>Chia sẻ</Text>
+                <TouchableOpacity style={[s.inviteActionBtn, { backgroundColor: '#133149' }]} onPress={handleShareInvite}>
+                  <Text style={[s.inviteActionTxt, { color: '#20C7B3' }]}>Chia sẻ</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -500,7 +500,7 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={s.versionTxt}>AMoon Eclipse · E2EE Messaging</Text>
+        <Text style={s.versionTxt}>Veyluro · E2EE Messaging</Text>
 
       </ScrollView>
 
@@ -549,10 +549,10 @@ export default function SettingsScreen() {
               <Text style={{ color: '#64748B', fontSize: 14, textAlign: 'center', marginVertical: 20 }}>Không có ai trong danh sách chặn</Text>
             ) : (
               blocked.map(b => (
-                <View key={b.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#12121E' }}>
+                <View key={b.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#102131' }}>
                   <Text style={{ flex: 1, color: '#F1F5F9', fontSize: 15 }}>@{b.username}</Text>
                   <TouchableOpacity
-                    style={{ backgroundColor: '#12121E', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: '#2E2E45' }}
+                    style={{ backgroundColor: '#102131', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: '#2E2E45' }}
                     onPress={() => {
                       Alert.alert('Bỏ chặn', `Bỏ chặn @${b.username}?`, [
                         { text: 'Hủy', style: 'cancel' },
@@ -598,7 +598,7 @@ export default function SettingsScreen() {
                   <Text style={s.secretLabel}>Hoặc nhập thủ công:</Text>
                   <Text style={s.secretTxt} selectable>{totpSecret}</Text>
                   <TouchableOpacity onPress={async () => { try { await Share.share({ message: totpSecret }) } catch { /* */ } }}>
-                    <Text style={{ color: '#6366F1', fontSize: 12, textAlign: 'center', marginTop: 4 }}>Copy secret</Text>
+                    <Text style={{ color: '#0FA79A', fontSize: 12, textAlign: 'center', marginTop: 4 }}>Copy secret</Text>
                   </TouchableOpacity>
                 </View>
                 <Text style={m.desc}>Nhập mã 6 số từ app TOTP để xác nhận:</Text>
@@ -696,7 +696,7 @@ function SettingRow({ icon: IconComponent, label, value, valueStyle, onPress, ch
       <Text style={s.settingLabel}>{label}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         {value && <Text style={[s.settingValue, valueStyle]}>{value}</Text>}
-        {chevron && <CaretRightIcon size={17} color="#374151" weight="bold" />}
+        {chevron && <CaretRightIcon size={17} color="#4E677F" weight="bold" />}
       </View>
     </TouchableOpacity>
   )
@@ -718,40 +718,40 @@ const s = StyleSheet.create({
   profileCard:    { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 24, marginHorizontal: 16, marginTop: 8, marginBottom: 4, backgroundColor: '#0E0E1C', borderRadius: 20, borderWidth: 1, borderColor: '#1A1A2E' },
   avatarPress:    { width: 88, height: 88, marginBottom: 12 },
   bigAvatar:      { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center' },
-  bigAvatarImg:   { width: 88, height: 88, borderRadius: 44, backgroundColor: '#12121E' },
-  bigAvatarTxt:   { color: '#818CF8', fontSize: 32, fontWeight: '700' },
-  avatarEditBadge:{ position: 'absolute', right: 0, bottom: 0, width: 28, height: 28, borderRadius: 14, backgroundColor: '#6366F1', alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#0E0E1C' },
+  bigAvatarImg:   { width: 88, height: 88, borderRadius: 44, backgroundColor: '#102131' },
+  bigAvatarTxt:   { color: '#20C7B3', fontSize: 32, fontWeight: '700' },
+  avatarEditBadge:{ position: 'absolute', right: 0, bottom: 0, width: 28, height: 28, borderRadius: 14, backgroundColor: '#0FA79A', alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#0E0E1C' },
   displayName:    { color: '#F1F5F9', fontSize: 20, fontWeight: '700', marginBottom: 2 },
-  usernameLabel:  { color: '#6366F1', fontSize: 13, marginBottom: 6 },
+  usernameLabel:  { color: '#0FA79A', fontSize: 13, marginBottom: 6 },
   bioTxt:         { color: '#64748B', fontSize: 13, textAlign: 'center', lineHeight: 18, marginBottom: 8 },
-  editProfileBtn: { marginTop: 8, backgroundColor: '#1E1B4B', borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10 },
-  editProfileTxt: { color: '#818CF8', fontSize: 14, fontWeight: '600' },
+  editProfileBtn: { marginTop: 8, backgroundColor: '#133149', borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10 },
+  editProfileTxt: { color: '#20C7B3', fontSize: 14, fontWeight: '600' },
   deleteAvatarBtn:{ marginTop: 10, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 6 },
   deleteAvatarTxt:{ color: '#EF4444', fontSize: 13, fontWeight: '600' },
   sectionTitle:   { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8 },
-  sectionTitleTxt:{ color: '#374151', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+  sectionTitleTxt:{ color: '#4E677F', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
   section:        { marginHorizontal: 16, backgroundColor: '#0E0E1C', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#1A1A2E' },
-  settingRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#12121E' },
+  settingRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#102131' },
   settingIcon:    { marginRight: 12, width: 26, alignItems: 'center' },
   settingLabel:   { flex: 1, color: '#E2E8F0', fontSize: 15 },
   settingValue:   { color: '#64748B', fontSize: 13 },
   valueOn:        { color: '#22C55E', fontWeight: '600' },
   valueOff:       { color: '#64748B' },
-  inviteLinkBox:  { paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#12121E' },
+  inviteLinkBox:  { paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#102131' },
   inviteLinkLabel:{ color: '#64748B', fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 6 },
-  inviteLinkTxt:  { color: '#818CF8', fontSize: 13, fontFamily: 'monospace', marginBottom: 10 },
+  inviteLinkTxt:  { color: '#20C7B3', fontSize: 13, fontFamily: 'monospace', marginBottom: 10 },
   inviteBtnRow:   { flexDirection: 'row', gap: 8 },
-  inviteActionBtn:{ flex: 1, backgroundColor: '#12121E', borderRadius: 10, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: '#1E1E30' },
+  inviteActionBtn:{ flex: 1, backgroundColor: '#102131', borderRadius: 10, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: '#1B2F43' },
   inviteActionTxt:{ color: '#94A3B8', fontSize: 13, fontWeight: '600' },
   logoutRow:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 15 },
-  rowDivider:     { height: 1, backgroundColor: '#12121E', marginHorizontal: 16 },
+  rowDivider:     { height: 1, backgroundColor: '#102131', marginHorizontal: 16 },
   logoutIco:      { marginRight: 12, width: 26 },
   logoutTxt:      { color: '#EF4444', fontSize: 15, fontWeight: '600' },
-  versionTxt:     { color: '#1E1E30', fontSize: 11, textAlign: 'center', marginTop: 28 },
-  secretBox:      { backgroundColor: '#0D0D1A', borderRadius: 12, padding: 14, marginBottom: 14 },
+  versionTxt:     { color: '#1B2F43', fontSize: 11, textAlign: 'center', marginTop: 28 },
+  secretBox:      { backgroundColor: '#0B1724', borderRadius: 12, padding: 14, marginBottom: 14 },
   secretLabel:    { color: '#64748B', fontSize: 11, marginBottom: 8 },
-  secretTxt:      { color: '#818CF8', fontSize: 14, fontFamily: 'monospace', textAlign: 'center', letterSpacing: 2 },
-  updateNoteBox:  { backgroundColor: '#0D0D1A', borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#1E1E30' },
+  secretTxt:      { color: '#20C7B3', fontSize: 14, fontFamily: 'monospace', textAlign: 'center', letterSpacing: 2 },
+  updateNoteBox:  { backgroundColor: '#0B1724', borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#1B2F43' },
   updateNoteTxt:  { color: '#94A3B8', fontSize: 12, lineHeight: 17 },
 })
 
@@ -763,10 +763,10 @@ const m = StyleSheet.create({
   desc:       { color: '#64748B', fontSize: 13, lineHeight: 18, marginBottom: 16 },
   field:      { marginBottom: 14 },
   label:      { color: '#64748B', fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginBottom: 7, textTransform: 'uppercase' },
-  input:      { backgroundColor: '#0D0D1A', borderWidth: 1.5, borderColor: '#1E1E30', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: '#F1F5F9', fontSize: 15 },
+  input:      { backgroundColor: '#0B1724', borderWidth: 1.5, borderColor: '#1B2F43', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: '#F1F5F9', fontSize: 15 },
   btnRow:     { flexDirection: 'row', gap: 10, marginTop: 8 },
-  cancel:     { flex: 1, backgroundColor: '#12121E', borderRadius: 14, paddingVertical: 15, alignItems: 'center', borderWidth: 1, borderColor: '#1E1E30' },
+  cancel:     { flex: 1, backgroundColor: '#102131', borderRadius: 14, paddingVertical: 15, alignItems: 'center', borderWidth: 1, borderColor: '#1B2F43' },
   cancelTxt:  { color: '#64748B', fontSize: 15, fontWeight: '600' },
-  confirm:    { flex: 2, backgroundColor: '#6366F1', borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
+  confirm:    { flex: 2, backgroundColor: '#0FA79A', borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
   confirmTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
 })

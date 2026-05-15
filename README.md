@@ -1,50 +1,51 @@
-# AMoon Eclipse
+# Veyluro
 
 <div align="center">
 
 ```text
- █████╗ ███╗   ███╗ ██████╗  ██████╗ ███╗   ██╗
-██╔══██╗████╗ ████║██╔═══██╗██╔═══██╗████╗  ██║
-███████║██╔████╔██║██║   ██║██║   ██║██╔██╗ ██║
-██╔══██║██║╚██╔╝██║██║   ██║██║   ██║██║╚██╗██║
-██║  ██║██║ ╚═╝ ██║╚██████╔╝╚██████╔╝██║ ╚████║
-╚═╝  ╚═╝╚═╝     ╚═╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═══╝
-         A M O O N   E C L I P S E
+██╗   ██╗███████╗██╗   ██╗██╗     ██╗   ██╗██████╗  ██████╗
+██║   ██║██╔════╝╚██╗ ██╔╝██║     ██║   ██║██╔══██╗██╔═══██╗
+██║   ██║█████╗   ╚████╔╝ ██║     ██║   ██║██████╔╝██║   ██║
+╚██╗ ██╔╝██╔══╝    ╚██╔╝  ██║     ██║   ██║██╔══██╗██║   ██║
+ ╚████╔╝ ███████╗   ██║   ███████╗╚██████╔╝██║  ██║╚██████╔╝
+  ╚═══╝  ╚══════╝   ╚═╝   ╚══════╝ ╚═════╝ ╚═╝  ╚═╝ ╚═════╝
+           V E Y L U R O   ·   W A T E R   &   D R A G O N
 ```
 
-**End-to-End Encrypted Messenger - Web · Mobile · Desktop**
+> **Slogan:** Veil your privacy. Let the dragon flow.
+
+**End-to-End Encrypted Messenger - Mobile · Desktop · Server Web**
 
 [![Go](https://img.shields.io/badge/Go-1.23-00ADD8?logo=go)](https://go.dev)
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react)](https://react.dev)
-[![Expo](https://img.shields.io/badge/Expo-51-000020?logo=expo)](https://expo.dev)
+[![Expo](https://img.shields.io/badge/Expo-54-000020?logo=expo)](https://expo.dev)
 [![Wails](https://img.shields.io/badge/Wails-v2-ff6b6b)](https://wails.io)
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
 </div>
 
 ---
 
-## What Is AMoon Eclipse?
+## What Is Veyluro?
 
-AMoon Eclipse is a **zero-knowledge, end-to-end encrypted** messenger built as a monorepo for web, mobile, and desktop.
-The server stores encrypted bundles and delivery metadata, but it does not hold the private keys used to decrypt messages.
+Veyluro là nền tảng nhắn tin **zero-knowledge, end-to-end encrypted** cho mobile + desktop.
+Server chỉ lưu encrypted bundle và metadata giao vận, không giữ private key để đọc nội dung tin nhắn.
 
-- **Web** - React 18 + Vite
 - **Mobile** - React Native + Expo
 - **Desktop** - Wails v2
 - **Backend** - Go + Chi + MySQL/MariaDB + WebSocket hub
+- **Web runtime** - static bundle được serve từ `packages/server/cmd/server/web`
 
-Messages are encrypted on the client with **AES-256-GCM**. The per-message session key is wrapped per recipient using **RSA-2048-OAEP**. Private keys stay on the client device.
+Messages được mã hóa client-side bằng **AES-256-GCM**. Session key mỗi tin nhắn được wrap theo từng recipient bằng **RSA-2048-OAEP**.
 
 ---
 
 ## Current State
 
-- `apps/mobile2` is the main mobile target
-- `apps/mobile` remains as a legacy client for compatibility
-- avatar uploads go to Cloudflare R2
-- shared crypto lives under `packages/common`
-- server API and realtime delivery live under `packages/server`
+- `apps/mobile` là mobile app chính
+- `apps/desktop/wails-app` là desktop app chính
+- `apps/android-native` là hướng native song song (work-in-progress)
+- shared crypto/types nằm ở `packages/common`
+- server API + realtime nằm ở `packages/server`
 
 ---
 
@@ -87,8 +88,8 @@ Messages are encrypted on the client with **AES-256-GCM**. The per-message sessi
 
 | Platform | Storage | Backed by |
 |----------|---------|-----------|
-| Web | IndexedDB (`idb`) | Browser origin |
-| Desktop | IndexedDB | WebView storage |
+| Web bundle runtime | IndexedDB (`idb`) | Browser origin |
+| Desktop (Wails) | IndexedDB | WebView storage |
 | Mobile | `expo-secure-store` | Android Keystore / iOS Keychain |
 
 ---
@@ -96,12 +97,11 @@ Messages are encrypted on the client with **AES-256-GCM**. The per-message sessi
 ## Monorepo Structure
 
 ```text
-amoon-eclipse/
+veyluro/
 ├── apps/
-│   ├── web/
 │   ├── mobile/
-│   ├── mobile2/
-│   └── desktop/wails-app/
+│   ├── desktop/wails-app/
+│   └── android-native/
 ├── packages/
 │   ├── common/
 │   └── server/
@@ -126,9 +126,8 @@ amoon-eclipse/
 | Passphrase key recovery | ✅ |
 | User blocking | ✅ |
 | Admin moderation tools | ✅ |
-| Avatar upload to R2 | ✅ |
-| Web client | ✅ |
-| Mobile clients | ✅ |
+| Avatar upload to Cloudflare R2 | ✅ |
+| Mobile client | ✅ |
 | Desktop client | ✅ |
 
 ---
@@ -140,73 +139,66 @@ Requirements:
 - Node.js 20+
 - pnpm 9+
 - Go 1.23+
-- MySQL 8+ or MariaDB 10.6+
+- MySQL 8+ hoặc MariaDB 10.6+
 
 Common commands:
 
 ```bash
 pnpm install
-npm run dev:web
 npm run dev:mobile
-cd apps/mobile2 && npx expo start
-cd apps/mobile2 && npm run build:apk
-cd apps/desktop/wails-app && wails build
+cd apps/desktop/wails-app && /home/congmc/go/bin/wails dev
 cd packages/server && go run ./cmd/server
 ```
 
-For release builds, rebuild the server binary and regenerate the mobile APK after any API, crypto, or asset change.
+Release examples:
+
+```bash
+# Android
+cd apps/mobile/android && ./gradlew clean assembleRelease
+
+# Wails Linux
+cd apps/desktop/wails-app && /home/congmc/go/bin/wails build
+
+# Wails Windows portable + installer
+/home/congmc/go/bin/wails build -platform windows/amd64
+/home/congmc/go/bin/wails build -platform windows/amd64 -nsis
+```
+
+---
+
+## Web reCAPTCHA (web-only)
+
+reCAPTCHA chỉ áp dụng cho auth flow của web runtime:
+
+- `register`
+- `login`
+- `forgot-password`
+- `reset-password`
+
+Bản mobile/desktop không bị ép captcha.
+
+Env cần set:
+
+- Server: `RECAPTCHA_SECRET_KEY`
+- Frontend web: `VITE_RECAPTCHA_SITE_KEY`
 
 ---
 
 ## Configuration
 
-See:
+Xem các file template:
 
-- [`packages/server/.env.example`](packages/server/.env.example)
-- [`apps/mobile2/.env.example`](apps/mobile2/.env.example)
+- `packages/server/.env.example`
+- `apps/mobile/.env.example`
+- `apps/desktop/wails-app/frontend/.env.example`
 
-Typical backend values include:
-
-- `DB_DSN`
-- `JWT_SECRET`
-- `DB_ENCRYPTION_KEY`
-- `DB_HMAC_KEY`
-- `PORT`
-- `ALLOWED_ORIGINS`
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
-- `R2_ACCOUNT_ID`
-- `R2_ACCESS_KEY_ID`
-- `R2_SECRET_ACCESS_KEY`
-- `R2_BUCKET`
-- `R2_PUBLIC_BASE_URL`
-
-Do not commit local `.env` files or deployment secrets.
-
----
-
-## Deployment
-
-- Keep backend secrets on the server or panel only
-- Use the public API URL in mobile and desktop runtime config
-- Enable Cloudflare image transformations if you want avatar thumbnails
-- Rebuild the Android APK and Wails binary after release-side changes
+Không commit `.env` runtime secrets hoặc keystore vào public repo.
 
 ---
 
 ## Documentation
 
 - [Changelog](CHANGELOG.md)
-- [Terms of Service](TERMS.md)
-- [Privacy Policy](PRIVACY.md)
-- [Security Policy](SECURITY.md)
+- [Release Notes 1.6.0](RELEASE_NOTES_1.6.0.md)
+- [Public Env Audit](PUBLIC_ENV_AUDIT.md)
 
----
-
-## Contributing
-
-Pull requests are welcome.
-
-Before changing shared crypto or message formats, check the cross-platform impact carefully. The shared logic under `packages/common` must stay compatible across web, mobile, and desktop.
-
-Also read [`AGENTS.md`](./AGENTS.md) before contributing.

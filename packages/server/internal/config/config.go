@@ -56,7 +56,7 @@ type Config struct {
 	GoogleClientID     string   // Web client ID
 	GoogleClientSecret string   // Web client secret
 	GoogleRedirectURI  string   // OAuth redirect URI
-	OAuthAppRedirect   string   // Deep-link URI về app, vd: amoon-eclipse://auth
+	OAuthAppRedirect   string   // Deep-link URI về app, vd: veyluro://auth
 	CFTurnTokenID      string   // Cloudflare TURN token ID
 	CFTurnAPIToken     string   // Cloudflare TURN API token
 	R2AccountID        string   // Cloudflare R2 account ID
@@ -70,11 +70,12 @@ type Config struct {
 	RedisURL           string   // redis://user:pass@host:6379/0
 	RedisPrefix        string   // key prefix for distributed rate limit
 	FacebookAppID      string   // App ID để verify token
+	RecaptchaSecretKey string   // Google reCAPTCHA secret key (server verify)
 	SMTPHost           string   // VD: mail.yourdomain.com
 	SMTPPort           string   // 587 hoặc 465
 	SMTPUser           string   // địa chỉ email đầy đủ
 	SMTPPass           string   // mật khẩu email
-	EmailFrom          string   // VD: AMoon Eclipse <noreply@yourdomain.com>
+	EmailFrom          string   // VD: Veyluro <noreply@yourdomain.com>
 }
 
 func Load() *Config {
@@ -93,7 +94,7 @@ func Load() *Config {
 		GoogleClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
 		GoogleRedirectURI:  getEnv("GOOGLE_REDIRECT_URI", "http://localhost:8080/api/auth/google/callback"),
-		OAuthAppRedirect:   getEnv("OAUTH_APP_REDIRECT", "amoon-eclipse://auth"),
+		OAuthAppRedirect:   getEnv("OAUTH_APP_REDIRECT", "veyluro://auth"),
 		CFTurnTokenID:      getEnv("CF_TURN_TOKEN_ID", ""),
 		CFTurnAPIToken:     getEnv("CF_TURN_API_TOKEN", ""),
 		R2AccountID:        getEnv("R2_ACCOUNT_ID", ""),
@@ -105,13 +106,14 @@ func Load() *Config {
 		R2BlockBytes:       getEnvInt64("R2_BLOCK_BYTES", 7*1024*1024*1024),
 		R2UsageSeedBytes:   getEnvInt64("R2_USAGE_SEED_BYTES", 0),
 		RedisURL:           getEnv("REDIS_URL", ""),
-		RedisPrefix:        getEnv("REDIS_PREFIX", "amoon"),
+		RedisPrefix:        getEnv("REDIS_PREFIX", "veyluro"),
 		FacebookAppID:      getEnv("FACEBOOK_APP_ID", ""),
+		RecaptchaSecretKey: getEnv("RECAPTCHA_SECRET_KEY", ""),
 		SMTPHost:           getEnv("SMTP_HOST", ""),
 		SMTPPort:           getEnv("SMTP_PORT", "587"),
 		SMTPUser:           getEnv("SMTP_USER", ""),
 		SMTPPass:           getEnv("SMTP_PASS", ""),
-		EmailFrom:          getEnv("EMAIL_FROM", "AMoon Eclipse <noreply@amoon-eclipse.app>"),
+		EmailFrom:          getEnv("EMAIL_FROM", "Veyluro <noreply@dev.anhcong.veyluro>"),
 	}
 }
 

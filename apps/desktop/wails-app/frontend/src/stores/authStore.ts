@@ -8,6 +8,9 @@ import {
 
 export const API = API_BASE_URL
 export const WS_BASE = WS_BASE_URL
+const IS_WAILS_DESKTOP = typeof window !== 'undefined' && !!(window as any).go?.main?.App
+const authBaseHeaders = () =>
+  IS_WAILS_DESKTOP ? { 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json', 'X-Client-Platform': 'web' }
 
 interface AuthState {
   isAuthenticated: boolean
@@ -18,8 +21,8 @@ interface AuthState {
   token:      string | null
   needsKeyRecovery: boolean
 
-  login:           (username: string, password: string, totpCode?: string) => Promise<void>
-  register:        (username: string, email: string, password: string, passphrase: string) => Promise<void>
+  login:           (username: string, password: string, totpCode?: string, recaptchaToken?: string) => Promise<void>
+  register:        (username: string, email: string, password: string, passphrase: string, recaptchaToken?: string) => Promise<void>
   loginWithOAuth:  (accessToken: string, passphrase?: string) => Promise<void>
   completeOAuthLogin: (payload: { userId: string; username: string; token: string }, passphrase?: string) => Promise<void>
   logout:          () => void
@@ -119,13 +122,13 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isAuthenticated: true, userId, username, token, publicKey: pubKey || null, privateKey: privKey, needsKeyRecovery: false })
   },
 
-  register: async (username, email, password, passphrase) => {
+  register: async (username, email, password, passphrase, recaptchaToken) => {
     const passwordHash = password
 
     const res = await fetch(`${API}/api/auth/register`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, email, password: passwordHash }),
+      headers: authBaseHeaders(),
+      body: JSON.stringify({ username, email, password: passwordHash, recaptchaToken }),
     })
     if (!res.ok) throw new Error((await res.json()).error ?? 'Registration failed')
     const data = await res.json()
@@ -137,15 +140,16 @@ export const useAuthStore = create<AuthState>((set) => ({
     saveSession(userId, username, data.token ?? '', created.publicKey)
   },
 
-  login: async (username, password, totpCode) => {
+  login: async (username, password, totpCode, recaptchaToken) => {
     const passwordHash = password
     const res = await fetch(`${API}/api/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authBaseHeaders(),
       body: JSON.stringify({
         username,
         password: passwordHash,
         ...(totpCode?.trim() ? { totpCode: totpCode.trim() } : {}),
+        recaptchaToken,
       }),
     })
     if (!res.ok) throw new Error((await res.json()).error ?? 'Login failed')

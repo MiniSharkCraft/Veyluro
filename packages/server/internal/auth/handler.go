@@ -34,6 +34,7 @@ type Handler struct {
 	googleRedirectURI  string
 	oauthAppRedirect   string
 	facebookAppID      string
+	recaptchaSecretKey string
 	mailer             *email.Sender
 	oauthStateMu       sync.Mutex
 	oauthStateStore    map[string]int64
@@ -56,7 +57,7 @@ func (h *Handler) oauthRedirectTarget() string {
 	if t := strings.TrimSpace(h.oauthAppRedirect); t != "" {
 		return t
 	}
-	return "amoon-eclipse://auth"
+	return "veyluro://auth"
 }
 
 func (h *Handler) redirectOAuthError(w http.ResponseWriter, r *http.Request, code string) {
@@ -69,6 +70,7 @@ func NewHandler(
 	enc *dbcrypto.FieldEncryptor,
 	hmac *dbcrypto.HmacTokener,
 	googleClientID, googleClientSecret, googleRedirectURI, oauthAppRedirect, facebookAppID string,
+	recaptchaSecretKey string,
 	mailer *email.Sender,
 ) *Handler {
 	return &Handler{
@@ -81,10 +83,63 @@ func NewHandler(
 		googleRedirectURI:  googleRedirectURI,
 		oauthAppRedirect:   oauthAppRedirect,
 		facebookAppID:      facebookAppID,
+		recaptchaSecretKey: strings.TrimSpace(recaptchaSecretKey),
 		mailer:             mailer,
 		oauthStateStore:    map[string]int64{},
 		oauthCodeStore:     map[string]oauthExchangePayload{},
 	}
+}
+
+func (h *Handler) verifyRecaptcha(ctx context.Context, token, remoteIP, action string) error {
+	if h.recaptchaSecretKey == "" {
+		return nil
+	}
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return fmt.Errorf("captcha_required")
+	}
+	form := url.Values{}
+	form.Set("secret", h.recaptchaSecretKey)
+	form.Set("response", token)
+	if remoteIP != "" {
+		form.Set("remoteip", remoteIP)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://www.google.com/recaptcha/api/siteverify", strings.NewReader(form.Encode()))
+	if err != nil {
+		return fmt.Errorf("captcha_unavailable")
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("captcha_unavailable")
+	}
+	defer resp.Body.Close()
+	var out struct {
+		Success bool    `json:"success"`
+		Score   float64 `json:"score"`
+		Action  string  `json:"action"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return fmt.Errorf("captcha_unavailable")
+	}
+	if !out.Success {
+		return fmt.Errorf("captcha_invalid")
+	}
+	// For v3: optional action/score checks when present.
+	if action != "" && out.Action != "" && out.Action != action {
+		return fmt.Errorf("captcha_invalid")
+	}
+	if out.Score > 0 && out.Score < 0.4 {
+		return fmt.Errorf("captcha_low_score")
+	}
+	return nil
+}
+
+func (h *Handler) captchaEnabledForRequest(r *http.Request) bool {
+	if h.recaptchaSecretKey == "" {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Client-Platform")), "web")
 }
 
 func (h *Handler) Routes() chi.Router {
@@ -143,6 +198,7 @@ type registerReq struct {
 	Password    string `json:"password"` // Argon2id hash từ client
 	PublicKey   string `json:"publicKey"`
 	Fingerprint string `json:"fingerprint"`
+	Recaptcha   string `json:"recaptchaToken"`
 }
 
 func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
@@ -152,6 +208,12 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.Username = strings.TrimSpace(req.Username)
+	if h.captchaEnabledForRequest(r) {
+		if err := h.verifyRecaptcha(r.Context(), req.Recaptcha, r.RemoteAddr, "register"); err != nil {
+			jsonError(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+	}
 
 	// Check username đã tồn tại chưa
 	var exists int
@@ -202,6 +264,7 @@ type loginReq struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 	TOTPCode string `json:"totpCode"`
+	Recaptcha string `json:"recaptchaToken"`
 }
 
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
@@ -209,6 +272,12 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
+	}
+	if h.captchaEnabledForRequest(r) {
+		if err := h.verifyRecaptcha(r.Context(), req.Recaptcha, r.RemoteAddr, "login"); err != nil {
+			jsonError(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
 	}
 
 	var id, username, hash, totpSecret string
@@ -240,15 +309,15 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var pubKey, signalBundle string
-	h.db.QueryRowContext(r.Context(), `SELECT COALESCE(public_key,''), COALESCE(signal_bundle,'') FROM users WHERE id=?`, id).Scan(&pubKey, &signalBundle)
+	var pubKey string
+	h.db.QueryRowContext(r.Context(), `SELECT COALESCE(public_key,'') FROM users WHERE id=?`, id).Scan(&pubKey)
 
 	token, err := h.issueJWT(r.Context(), id, username)
 	if err != nil {
 		jsonError(w, "token error", http.StatusInternalServerError)
 		return
 	}
-	jsonOK(w, map[string]any{"token": token, "userId": id, "username": username, "publicKey": pubKey, "signalBundle": signalBundle})
+	jsonOK(w, map[string]any{"token": token, "userId": id, "username": username, "publicKey": pubKey})
 }
 
 // ── OAuth (Google / Facebook) ──────────────────────────────────────────────
@@ -351,23 +420,22 @@ func (h *Handler) registerKey(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(ContextKeyUserID).(string)
 
 	var req registerKeyReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.PublicKey == "" {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
 
-	signalBundleJSON := ""
-	if req.SignalBundle != nil {
-		if b, err := json.Marshal(req.SignalBundle); err == nil {
-			signalBundleJSON = string(b)
-		}
+	publicKey := strings.TrimSpace(req.PublicKey)
+	fingerprint := strings.TrimSpace(req.Fingerprint)
+	if publicKey == "" {
+		jsonOK(w, map[string]string{"status": "ok", "mode": "legacy-e2ee"})
+		return
 	}
 
 	_, err := h.db.ExecContext(r.Context(),
-		`UPDATE users SET public_key=?, fingerprint=?, signal_bundle=? WHERE id=?`,
-		nullStr(strings.TrimSpace(req.PublicKey)),
-		nullStr(strings.TrimSpace(req.Fingerprint)),
-		nullStr(strings.TrimSpace(signalBundleJSON)),
+		`UPDATE users SET public_key=?, fingerprint=?, signal_bundle=NULL WHERE id=?`,
+		nullStr(publicKey),
+		nullStr(fingerprint),
 		userID,
 	)
 	if err != nil {
@@ -501,7 +569,8 @@ const ContextKeyUsername contextKey = "username"
 // ── Forgot Password ────────────────────────────────────────────────────────
 
 type forgotReq struct {
-	Email string `json:"email"`
+	Email     string `json:"email"`
+	Recaptcha string `json:"recaptchaToken"`
 }
 
 func (h *Handler) forgotPassword(w http.ResponseWriter, r *http.Request) {
@@ -509,6 +578,12 @@ func (h *Handler) forgotPassword(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Email == "" {
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
+	}
+	if h.captchaEnabledForRequest(r) {
+		if err := h.verifyRecaptcha(r.Context(), req.Recaptcha, r.RemoteAddr, "forgot_password"); err != nil {
+			jsonError(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
 	}
 
 	// Tìm user qua email token
@@ -560,9 +635,10 @@ func (h *Handler) forgotPassword(w http.ResponseWriter, r *http.Request) {
 }
 
 type resetReq struct {
-	Email    string `json:"email"`
-	OTP      string `json:"otp"`
-	Password string `json:"password"` // new password hash
+	Email     string `json:"email"`
+	OTP       string `json:"otp"`
+	Password  string `json:"password"` // new password hash
+	Recaptcha string `json:"recaptchaToken"`
 }
 
 const maxResetOTPAttempts = 5
@@ -572,6 +648,12 @@ func (h *Handler) resetPassword(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Email == "" || req.OTP == "" || req.Password == "" {
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
+	}
+	if h.captchaEnabledForRequest(r) {
+		if err := h.verifyRecaptcha(r.Context(), req.Recaptcha, r.RemoteAddr, "reset_password"); err != nil {
+			jsonError(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
 	}
 
 	token := h.hmac.Token(strings.ToLower(req.Email))
@@ -682,7 +764,7 @@ func (h *Handler) googleStart(w http.ResponseWriter, r *http.Request) {
 	state := randomURLToken(32)
 	h.storeOAuthState(state, time.Now().Add(10*time.Minute).Unix())
 	http.SetCookie(w, &http.Cookie{
-		Name:     "amoon_oauth_state",
+		Name:     "veyluro_oauth_state",
 		Value:    state,
 		Path:     "/api/auth/google/callback",
 		HttpOnly: true,
@@ -715,6 +797,9 @@ func (h *Handler) googleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	cookie, err := r.Cookie("amoon_oauth_state")
 	if err != nil || cookie == nil || strings.TrimSpace(cookie.Value) == "" {
+		cookie, err = r.Cookie("veyluro_oauth_state")
+	}
+	if err != nil || cookie == nil || strings.TrimSpace(cookie.Value) == "" {
 		h.redirectOAuthError(w, r, "missing_state_cookie")
 		return
 	}
@@ -726,6 +811,15 @@ func (h *Handler) googleCallback(w http.ResponseWriter, r *http.Request) {
 		h.redirectOAuthError(w, r, "expired_state")
 		return
 	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     "veyluro_oauth_state",
+		Value:    "",
+		Path:     "/api/auth/google/callback",
+		HttpOnly: true,
+		Secure:   isHTTPSRequest(r),
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+	})
 	http.SetCookie(w, &http.Cookie{
 		Name:     "amoon_oauth_state",
 		Value:    "",
@@ -880,14 +974,14 @@ func (h *Handler) forgotUsername(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	html := fmt.Sprintf(`
-<div style="font-family:sans-serif;max-width:400px;margin:40px auto;background:#0E0E1C;color:#F1F5F9;padding:32px;border-radius:16px;border:1px solid #1E1E30">
-  <h2 style="color:#818CF8;margin:0 0 8px">🌙 AMoon Eclipse</h2>
+<div style="font-family:sans-serif;max-width:400px;margin:40px auto;background:#0B1724;color:#EAF4FF;padding:32px;border-radius:16px;border:1px solid #1B2F43">
+  <h2 style="color:#20C7B3;margin:0 0 8px">🌊 Veyluro</h2>
   <p style="color:#64748B;margin:0 0 24px;font-size:13px">Khôi phục tên người dùng</p>
   <p style="margin:0 0 16px">Tên người dùng của bạn:</p>
-  <div style="background:#1E1B4B;border-radius:12px;padding:20px;text-align:center;font-size:24px;font-weight:700;color:#818CF8">%s</div>
+  <div style="background:#133149;border-radius:12px;padding:20px;text-align:center;font-size:24px;font-weight:700;color:#20C7B3">%s</div>
   <p style="color:#64748B;font-size:12px;margin:16px 0 0">Nếu bạn không yêu cầu, bỏ qua email này.</p>
 </div>`, username)
-	if err := h.mailer.Send(emailPlain, "Tên người dùng AMoon Eclipse của bạn", html); err != nil {
+	if err := h.mailer.Send(emailPlain, "Tên người dùng Veyluro của bạn", html); err != nil {
 		log.Printf("ERROR forgotUsername to %s: %v", emailPlain, err)
 		jsonError(w, "không gửi được email, thử lại sau", http.StatusInternalServerError)
 		return

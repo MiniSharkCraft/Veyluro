@@ -6,4 +6,4 @@ export const API_BASE_URL = apiBase && apiBase.length > 0 ? apiBase : 'http://lo
 export const WS_BASE_URL = wsBase && wsBase.length > 0 ? wsBase : API_BASE_URL.replace(/^http/, 'ws')
 export const UPDATE_META_URL = updateMetaUrl && updateMetaUrl.length > 0
   ? updateMetaUrl
-  : 'https://api.anhcong.dev/v1/amoon-eclipse/update'
+  : 'https://api.anhcong.dev/v1/veyluro/update'

@@ -37,9 +37,9 @@ export default function GoogleCallbackScreen() {
       }
       try {
         await Promise.all([
-          SecureStore.setItemAsync('amoon_userId', userId),
-          SecureStore.setItemAsync('amoon_username', username ?? ''),
-          SecureStore.setItemAsync('amoon_token', token),
+          SecureStore.setItemAsync('veyluro_userId', userId),
+          SecureStore.setItemAsync('veyluro_username', username ?? ''),
+          SecureStore.setItemAsync('veyluro_token', token),
         ])
 
         const existing = await SecureStore.getItemAsync(`privateKey_${userId}`)
@@ -99,7 +99,7 @@ export default function GoogleCallbackScreen() {
   if (step === 'loading') {
     return (
       <View style={s.center}>
-        <ActivityIndicator color="#6366F1" size="large" />
+        <ActivityIndicator color="#0FA79A" size="large" />
       </View>
     )
   }
@@ -135,7 +135,7 @@ export default function GoogleCallbackScreen() {
           {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.btnTxt}>Xác nhận →</Text>}
         </TouchableOpacity>
         <TouchableOpacity style={{ marginTop: 14, alignItems: 'center' }} onPress={() => router.replace('/(app)/(tabs)')}>
-          <Text style={{ color: '#374151', fontSize: 13 }}>Bỏ qua (không backup được key)</Text>
+          <Text style={{ color: '#4E677F', fontSize: 13 }}>Bỏ qua (không backup được key)</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -146,13 +146,13 @@ const s = StyleSheet.create({
   center:    { flex: 1, backgroundColor: '#08080F', alignItems: 'center', justifyContent: 'center' },
   root:      { flex: 1, backgroundColor: '#08080F', justifyContent: 'center', padding: 24 },
   moonRow:   { alignItems: 'center', marginBottom: 28 },
-  moonOuter: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#6366F1', alignItems: 'flex-end', justifyContent: 'flex-start', padding: 6 },
+  moonOuter: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#0FA79A', alignItems: 'flex-end', justifyContent: 'flex-start', padding: 6 },
   moonInner: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#08080F' },
   title:     { color: '#F1F5F9', fontSize: 24, fontWeight: '800', textAlign: 'center', marginBottom: 10 },
   sub:       { color: '#64748B', fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 28 },
-  box:       { backgroundColor: '#12121E', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#1E1E30' },
+  box:       { backgroundColor: '#102131', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#1B2F43' },
   label:     { color: '#64748B', fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8 },
-  input:     { backgroundColor: '#0D0D1A', borderWidth: 1.5, borderColor: '#1E1E30', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: '#F1F5F9', fontSize: 15, marginBottom: 16 },
-  btn:       { backgroundColor: '#6366F1', borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 4 },
+  input:     { backgroundColor: '#0B1724', borderWidth: 1.5, borderColor: '#1B2F43', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, color: '#F1F5F9', fontSize: 15, marginBottom: 16 },
+  btn:       { backgroundColor: '#0FA79A', borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 4 },
   btnTxt:    { color: '#fff', fontSize: 15, fontWeight: '700' },
 })

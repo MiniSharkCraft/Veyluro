@@ -29,7 +29,7 @@ import { storiesApi, type RoomType, type StoryType } from '../../../src/lib/api'
 import { getTheme, type AppTheme } from '../../../src/lib/theme'
 import * as SecureStore from 'expo-secure-store'
 
-const RESTORE_SYNC_KEY = 'amoon_restore_sync_pending'
+const RESTORE_SYNC_KEY = 'veyluro_restore_sync_pending'
 
 function formatLastTime(ts: number): string {
   const d = new Date(ts * 1000)
@@ -105,7 +105,7 @@ function NotesRail({
       contentContainerStyle={s.notesRail}
     >
       {visibleNotes.map(note => {
-        const owner = note.displayName || note.username || 'AMoon'
+        const owner = note.displayName || note.username || 'Veyluro'
         return (
           <TouchableOpacity
             key={note.id}
@@ -180,7 +180,7 @@ export default function ChatsScreen() {
       />
 
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>AMoon</Text>
+        <Text style={styles.headerTitle}>Veyluro</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.iconBtn}
@@ -205,7 +205,7 @@ export default function ChatsScreen() {
           style={styles.searchText}
           value={search}
           onChangeText={setSearch}
-          placeholder="Hỏi AMoon AI hoặc tìm kiếm"
+          placeholder="Hỏi Veyluro AI hoặc tìm kiếm"
           placeholderTextColor={theme.muted}
           returnKeyType="search"
         />
